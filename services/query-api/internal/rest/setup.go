@@ -1,4 +1,5 @@
 package rest
+
 import (
 	"crypto/rand"
 	"crypto/sha256"
@@ -38,7 +39,7 @@ func (h *SetupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rawKey := "am_live_" + hex.EncodeToString(rawBytes)
-	
+
 	hash := sha256.Sum256([]byte(rawKey))
 	hashedKey := hex.EncodeToString(hash[:])
 	prefix := rawKey[:12]

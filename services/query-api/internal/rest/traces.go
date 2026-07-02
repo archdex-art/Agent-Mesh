@@ -19,12 +19,12 @@ import (
 // trace_rollups materialized view (System Design.md §5: "the list recent
 // traces query never scans raw spans").
 type TraceSummary struct {
-	TraceID       string  `json:"trace_id"`
-	SpanCount     uint64  `json:"span_count"`
-	ErrorSpans    uint64  `json:"error_span_count"`
-	TotalCostUSD  float64 `json:"total_cost_usd"`
-	TotalTokensIn uint64  `json:"total_token_input"`
-	TotalTokensOut uint64 `json:"total_token_output"`
+	TraceID        string  `json:"trace_id"`
+	SpanCount      uint64  `json:"span_count"`
+	ErrorSpans     uint64  `json:"error_span_count"`
+	TotalCostUSD   float64 `json:"total_cost_usd"`
+	TotalTokensIn  uint64  `json:"total_token_input"`
+	TotalTokensOut uint64  `json:"total_token_output"`
 }
 
 // TraceDetail is the single-trace response shape: the full ordered span

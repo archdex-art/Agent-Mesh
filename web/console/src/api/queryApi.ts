@@ -44,7 +44,7 @@ export interface TraceDetail {
 }
 
 interface ListTracesResponse {
-  traces: TraceSummary[];
+  traces: TraceSummary[] | null;
 }
 
 /** GET /v1/traces?limit=N */
@@ -52,7 +52,11 @@ export async function listTraces(limit = 50): Promise<TraceSummary[]> {
   const url = new URL('/v1/traces', QUERY_API_URL);
   url.searchParams.set('limit', String(limit));
   const res = await apiFetch<ListTracesResponse>(url.toString());
-  return res.traces;
+  // Defense-in-depth: an empty ClickHouse result set should serialize as
+  // `[]`, but never trust a JSON API to never regress into returning
+  // `null` for "no rows" (a common Go nil-slice-marshals-to-null gotcha)
+  // and crash the UI on `.filter`/spread over it.
+  return res.traces ?? [];
 }
 
 /** GET /v1/traces/{traceId} */

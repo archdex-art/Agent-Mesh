@@ -52,7 +52,7 @@ func (r *ClickHouseReader) ListTraceSummaries(ctx context.Context, projectID ids
 	}
 	defer rows.Close()
 
-	var summaries []rest.TraceSummary
+	summaries := make([]rest.TraceSummary, 0)
 	for rows.Next() {
 		var s rest.TraceSummary
 		var cost decimal.Decimal
@@ -109,19 +109,19 @@ func (r *ClickHouseReader) GetTraceSpans(ctx context.Context, projectID ids.Proj
 // pairing convention.
 func scanSpanRow(rows driver.Rows) (span.Span, error) {
 	var (
-		schemaVersion                        uint16
-		projectIDStr, traceIDStr, spanIDStr  string
-		parentSpanIDStr                      *string
-		kindStr                              string
-		name                                 string
-		startTime                            time.Time
-		endTime                              *time.Time
-		statusStr                            *string
-		inputInline, outputInline            *string
-		inputBlobRef, outputBlobRef          *string
-		tokenInput, tokenOutput              *uint32
-		cost                                 *decimal.Decimal
-		attributes                           map[string]string
+		schemaVersion                       uint16
+		projectIDStr, traceIDStr, spanIDStr string
+		parentSpanIDStr                     *string
+		kindStr                             string
+		name                                string
+		startTime                           time.Time
+		endTime                             *time.Time
+		statusStr                           *string
+		inputInline, outputInline           *string
+		inputBlobRef, outputBlobRef         *string
+		tokenInput, tokenOutput             *uint32
+		cost                                *decimal.Decimal
+		attributes                          map[string]string
 	)
 
 	if err := rows.Scan(

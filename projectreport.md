@@ -1,14 +1,14 @@
 # AgentMesh Project Report
 
 **Date:** July 2026  
-**Status:** Post-MVP (Milestone 5 of 8 Complete)
+**Status:** Post-MVP (Milestone 6 of 8 Complete)
 
 ## Executive Summary
 AgentMesh is a framework-agnostic control plane for AI agents that provides execution tracing, deterministic replay, MCP-native governance, and cost intelligence. 
-The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, completed reference integrations for the top four agent frameworks, crossed the MVP ship line with the Memory System and Web Console, and shipped the terminal/CLI experience with live realtime tracing.
+The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, completed reference integrations for the top four agent frameworks, crossed the MVP ship line with the Memory System and Web Console, shipped the terminal/CLI experience with live realtime tracing, and delivered the MCP Registry + Gateway governance layer.
 
 ---
-## 🟢 Completed Work (Milestones 1–5)
+## 🟢 Completed Work (Milestones 1–6)
 
 ### Milestone 1: Foundation
 * **Monorepo Architecture:** Scaffolded the Go services, Python/TS SDKs, web apps, and schema definitions.
@@ -42,16 +42,21 @@ The project has successfully laid its foundational data models, established the 
 * **CLI Distribution:** GoReleaser config + GitHub Actions release workflow producing cross-platform (Linux/macOS/Windows, amd64/arm64) binaries and a Homebrew formula on `cli-v*` tags.
 * **Deployment Completeness:** Wired both `realtime-gateway` and the previously-orphaned `jobs` worker (Milestone 4) into `docker-compose.yml` with Dockerfiles, and fixed a broken CI job (`go test ./...` at the repo root silently failed under the multi-module `go.work` layout) by matrixing Go tests per module.
 
+### Milestone 6: Plugin/MCP Ecosystem
+* **MCP Registry:** New Postgres schema (`mcp_servers`, `guardrail_policies`, `mcp_server_tokens`) plus a full Query API REST CRUD surface (`services/query-api/internal/rest/mcp_registry.go`) and a new Web Console **Registry view** — list registered servers, mint per-caller bearer tokens, remove servers — all backed by real, live-verified endpoints.
+* **MCP Gateway Multi-Server Routing:** The Gateway no longer proxies to one hardcoded upstream; it resolves `{server_name}` against the Registry per request (`services/mcp-gateway/internal/registry`), with the legacy single-upstream mode kept working unchanged for backward compatibility.
+* **OAuth 2.1-Style Caller Auth:** Per-server opaque bearer tokens (`services/mcp-gateway/internal/oauth`), hashed at rest via the same convention as AgentMesh's own API keys — deliberately scoped to bearer-token validation rather than a full authorization-code+PKCE flow, since that doesn't fit MCP's machine-to-machine calling pattern (matches the protocol's own 2026 client-credentials direction).
+* **Rate Limiting:** Redis fixed-window limiter (`services/mcp-gateway/internal/ratelimit`) enforced per `(server, caller)`, driven by an additive `rate_limit:` field on the existing guardrail policy YAML DSL — zero breaking changes to the pre-existing policy engine or its tests.
+* **Mock CRM MCP Server:** A minimal stdlib-only example target (`examples/mock-crm-mcp-server`) satisfying the milestone's exact success-criteria demo.
+* **`agentmesh mcp register`:** New CLI command completing the SDK→Registry→Gateway loop end to end.
+* **Two real bugs found and fixed during live verification** (not just unit tests): the Query API returned `{"traces":null}` instead of `[]` for an empty ClickHouse result, crashing the Console's default view for any brand-new project; and the CORS middleware was missing `DELETE` from `Access-Control-Allow-Methods`, silently blocking the new server-removal endpoint from any browser. Both fixed and re-verified live.
+
 ### Additional Completed Work
 * **Marketing Site:** Built a responsive, polished landing page (React, Tailwind v4, Framer Motion) communicating the product vision, linking directly to the repository and documentation.
 
 ---
 
-## 🟡 Immediate Next Step: Milestone 6
-
-**Milestone 6 — Plugin/MCP Ecosystem**
-* **MCP Registry:** Postgres-backed catalog of approved MCP servers.
-* **MCP Gateway:** A reverse proxy adding OAuth 2.1 authentication, audit trails, and declarative guardrail policies (rate limits, allow/deny lists) to any standard MCP server.
+## 🟡 Immediate Next Step: Milestone 7
 
 ### Milestone 7: AI Workflows (Replay & Anomalies)
 * **Deterministic Replay Engine:** Re-run historical agent traces using recorded tool I/O (trajectory mode for read-only viewing, execution mode for live testing against patched agent code).

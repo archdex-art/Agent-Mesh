@@ -2,12 +2,10 @@
 # every storage dependency AgentMesh's services need — Postgres (control
 # plane), ClickHouse (trace store), Redis (pub/sub + rate limiting), MinIO
 # (S3-compatible blob storage) — plus the Collector, Query API, Realtime
-# Gateway, background Jobs worker, and Web Console/Replay Engine services,
-# each depending on the storage layer's health checks so they never start
-# against a not-yet-ready dependency. Services still unimplemented
-# (mcp-gateway is built but not yet wired here pending Milestone 6's
-# Registry) are not pre-declared here — this file never carries stanzas
-# for code that does not exist yet.
+# Gateway, background Jobs worker, MCP Gateway (opt-in `mcp-gateway`
+# profile, see that stanza's comment for why), and Web Console/Replay
+# Engine services, each depending on the storage layer's health checks so
+# they never start against a not-yet-ready dependency.
 #
 # Host ports are env-overridable (`${VAR:-default}`) rather than hardcoded:
 # a developer machine that already runs Postgres/Redis on the standard ports
@@ -166,6 +164,37 @@ services:
       AGENTMESH_CLICKHOUSE_ADDR: "clickhouse:9000"
     # No exposed ports: jobs is a background worker with no HTTP surface
     # (Architecture.md §8's internal job queue, Milestone 4).
+
+  mcp-gateway:
+    build:
+      context: ..
+      dockerfile: services/mcp-gateway/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      collector:
+        condition: service_started
+    environment:
+      AGENTMESH_MCPGATEWAY_HTTP_ADDR: ":8092"
+      AGENTMESH_MCPGATEWAY_UPSTREAM_URL: "http://host.docker.internal:9090" # legacy single-upstream mode's default target; irrelevant once servers are registered via the Milestone 6 Registry
+      AGENTMESH_COLLECTOR_GRPC_ADDR: "collector:4317"
+      AGENTMESH_POSTGRES_DSN: "postgres://agentmesh:agentmesh@postgres:5432/agentmesh"
+      AGENTMESH_REDIS_ADDR: "redis:6379"
+      # AGENTMESH_MCPGATEWAY_API_KEY is required and has no safe default: the
+      # Gateway is itself an OTLP client of the Collector (it exports its own
+      # mcp.call audit spans) and therefore needs a real, Postgres-registered
+      # API key, which cannot exist before a project has been created —
+      # provision one first via `POST /v1/setup` against the query-api
+      # service (see README.md's "Local Development" section), then set
+      # AGENTMESH_MCPGATEWAY_API_KEY=<the returned api_key> in your shell (or
+      # a .env file next to this compose file) before `docker compose up
+      # mcp-gateway`. The Gateway refuses to start without it.
+      AGENTMESH_MCPGATEWAY_API_KEY: "${AGENTMESH_MCPGATEWAY_API_KEY:?set this to a real API key from POST /v1/setup — see README.md}"
+    ports:
+      - "${AGENTMESH_MCPGATEWAY_PORT:-8092}:8092"
+    profiles: ["mcp-gateway"] # opt-in: requires the manual API-key bootstrap step above, so it never blocks `docker compose up`'s default core-stack path
 
   console:
     build:

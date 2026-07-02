@@ -66,7 +66,7 @@ func NewGateway(upstreamURL string, interceptor Interceptor) (*Gateway, error) {
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(u)
-	
+
 	// We preserve the original Director logic from SingleHostReverseProxy
 	// but we don't need to modify it heavily here, as interception happens
 	// at the Handler level before the proxy is invoked.
@@ -120,7 +120,7 @@ func writeRPCError(w http.ResponseWriter, id json.RawMessage, code int, message 
 			Message: message,
 		},
 	}
-	
+
 	// If ID is null/missing, ensure it outputs as literally `null` in JSON per spec
 	if len(id) == 0 {
 		resp.ID = json.RawMessage(`null`)

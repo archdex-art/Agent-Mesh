@@ -59,14 +59,31 @@ type Policy struct {
 	Rules       []Rule   `yaml:"rules"`
 }
 
-// Document is the top-level YAML shape: a list of policies.
+// RateLimit is an OPTIONAL, additive extension to Document (Milestone 6's
+// per-server rate limiting requirement, docs/plan/Architecture.md §13):
+// a Redis-backed fixed-window cap the Gateway's router applies per
+// (mcp_server_id, caller) pair (services/mcp-gateway/internal/ratelimit).
+// It is a sibling of Policies, never nested inside a Policy, so an
+// existing "policies: only" document keeps parsing byte-for-byte
+// identically — this field simply stays nil when the YAML omits it.
+type RateLimit struct {
+	RequestsPerMinute int `yaml:"requests_per_minute"`
+}
+
+// Document is the top-level YAML shape: a list of policies plus the
+// optional rate_limit extension above.
 type Document struct {
-	Policies []Policy `yaml:"policies"`
+	Policies  []Policy   `yaml:"policies"`
+	RateLimit *RateLimit `yaml:"rate_limit,omitempty"`
 }
 
 // Engine evaluates ToolCall requests against a compiled set of policies.
+// It also retains the document's optional RateLimit so callers that only
+// hold an *Engine (not the original bytes/Document) can still read it —
+// see the RateLimit accessor method below.
 type Engine struct {
-	policies []Policy
+	policies  []Policy
+	rateLimit *RateLimit
 }
 
 // ToolCall is the subset of an MCP "tools/call" request the engine needs:
@@ -105,7 +122,16 @@ func Load(data []byte) (*Engine, error) {
 		}
 	}
 
-	return &Engine{policies: doc.Policies}, nil
+	return &Engine{policies: doc.Policies, rateLimit: doc.RateLimit}, nil
+}
+
+// RateLimit returns the document's optional rate_limit configuration, or
+// nil if the document never specified one — the router treats nil as
+// "no rate limiting configured for this server," matching this
+// package's existing fail-open default for an empty guardrail policy
+// set (Load([]byte("policies: []"))).
+func (e *Engine) RateLimit() *RateLimit {
+	return e.rateLimit
 }
 
 // LoadFile reads and loads a policy document from disk.

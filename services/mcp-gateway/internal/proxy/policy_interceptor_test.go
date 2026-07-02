@@ -145,4 +145,3 @@ func TestFullChainPassesThroughNonToolCallMethods(t *testing.T) {
 		t.Fatal("non-tools/call method was blocked, want pass-through")
 	}
 }
-

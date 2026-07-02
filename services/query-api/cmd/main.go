@@ -87,6 +87,7 @@ func run(logger *slog.Logger) error {
 	reader := store.NewClickHouseReader(chConn)
 	tracesHandler := rest.NewTracesHandler(reader, authz.ProjectIDFromRequest)
 	setupHandler := rest.NewSetupHandler(pgPool)
+	mcpRegistryHandler := rest.NewMCPRegistryHandler(pgPool, authz.ProjectIDFromRequest)
 	graphqlHandler, err := graphql.NewHandler(reader, authz.ProjectIDFromRequest)
 	if err != nil {
 		return fmt.Errorf("building graphql handler: %w", err)
@@ -96,10 +97,10 @@ func run(logger *slog.Logger) error {
 	mux.Handle("/v1/traces", authz.Middleware(authStore)(tracesHandler))
 	mux.Handle("/v1/traces/", authz.Middleware(authStore)(tracesHandler))
 	mux.Handle("/v1/graphql", authz.Middleware(authStore)(graphqlHandler))
+	mux.Handle("/v1/mcp/", authz.Middleware(authStore)(mcpRegistryHandler))
 	mux.Handle("/v1/setup", setupHandler)
 
 	handler := rest.CORSMiddleware(mux)
-
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,

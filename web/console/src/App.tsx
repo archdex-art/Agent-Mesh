@@ -3,6 +3,7 @@ import { TraceList } from './features/traces/TraceList';
 import { TraceDAGViewer } from './features/traces/TraceDAGViewer';
 import { CostDashboard } from './features/cost/CostDashboard';
 import { ReplayView } from './features/replay/ReplayView';
+import { RegistryView } from './features/registry/RegistryView';
 import { getApiKey, setApiKey, QUERY_API_URL } from './api/config';
 // Minimal state-based view switching rather than react-router: the console
 // has three flat views with a single forward chain (list -> DAG -> replay)
@@ -11,6 +12,7 @@ import { getApiKey, setApiKey, QUERY_API_URL } from './api/config';
 type View =
   | { name: 'traces' }
   | { name: 'cost' }
+  | { name: 'registry' }
   | { name: 'trace-detail'; traceId: string }
   | { name: 'replay'; traceId: string };
 
@@ -84,6 +86,12 @@ function App() {
             >
               Cost
             </button>
+            <button
+              onClick={() => setView({ name: 'registry' })}
+              className={view.name === 'registry' ? 'text-cyan' : 'text-mist hover:text-fog'}
+            >
+              Registry
+            </button>
           </nav>
         </div>
       </header>
@@ -95,6 +103,7 @@ function App() {
         {view.name === 'cost' && (
           <CostDashboard onSelectTrace={(traceId) => setView({ name: 'trace-detail', traceId })} />
         )}
+        {view.name === 'registry' && <RegistryView />}
         {view.name === 'trace-detail' && (
           <TraceDAGViewer
             traceId={view.traceId}

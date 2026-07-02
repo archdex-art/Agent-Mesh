@@ -18,12 +18,17 @@ import (
 
 	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/audit"
 	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/authz"
+	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/oauth"
 	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/policy"
 	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/proxy"
+	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/ratelimit"
+	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/registry"
+	"github.com/agentmesh/agentmesh/services/mcp-gateway/internal/router"
 	"github.com/agentmesh/agentmesh/shared/authkeys"
 	"github.com/agentmesh/agentmesh/shared/config"
 	"github.com/agentmesh/agentmesh/shared/logging"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 // serviceConfig is the Gateway's configuration surface, loaded per
@@ -38,6 +43,7 @@ type serviceConfig struct {
 	GatewayAPIKey      string `env:"AGENTMESH_MCPGATEWAY_API_KEY" yaml:"gateway_api_key"`
 	PostgresDSN        string `env:"AGENTMESH_POSTGRES_DSN" yaml:"postgres_dsn"`
 	APIKeyCacheTTLSecs int    `env:"AGENTMESH_APIKEY_CACHE_TTL_SECONDS" yaml:"apikey_cache_ttl_seconds"`
+	RedisAddr          string `env:"AGENTMESH_REDIS_ADDR" yaml:"redis_addr"`
 }
 
 func main() {
@@ -56,6 +62,7 @@ func run(logger *slog.Logger) error {
 		CollectorAddr:      "localhost:4317",
 		PostgresDSN:        "postgres://agentmesh:agentmesh@localhost:15432/agentmesh",
 		APIKeyCacheTTLSecs: 60,
+		RedisAddr:          "localhost:16379", // matches deploy/docker-compose.yml's redis port mapping
 	}
 	if err := config.NewLoader().Load(&cfg, os.Getenv("AGENTMESH_CONFIG_FILE")); err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -81,6 +88,25 @@ func run(logger *slog.Logger) error {
 		authkeys.NewPostgresStore(pgPool),
 		time.Duration(cfg.APIKeyCacheTTLSecs)*time.Second,
 	)
+
+	// The per-server registry route's rate limiting is best-effort
+	// infrastructure, mirroring services/collector/cmd/main.go's Redis
+	// wiring exactly: a Redis connection failure here logs a warning and
+	// disables rate limiting (nil *ratelimit.Limiter, which
+	// router.Router treats as "never limit") rather than failing Gateway
+	// startup, since guardrail enforcement and the legacy single-upstream
+	// mode must keep working even if Redis is unavailable.
+	redisClient := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		logger.Warn("redis unavailable, mcp registry rate limiting disabled", slog.String("addr", cfg.RedisAddr), slog.Any("err", err))
+		redisClient = nil
+	} else {
+		logger.Info("connected to redis", slog.String("addr", cfg.RedisAddr))
+	}
+	var limiter *ratelimit.Limiter
+	if redisClient != nil {
+		limiter = ratelimit.New(redisClient)
+	}
 
 	var policyEngine *policy.Engine
 	if cfg.PolicyFile != "" {
@@ -114,11 +140,29 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("creating gateway proxy: %w", err)
 	}
 
-	handler := authz.Middleware(authStore)(gw)
+	// Legacy single-hardcoded-upstream mode: unchanged from before
+	// Milestone 6, kept working for whatever already depends on it.
+	legacyHandler := authz.Middleware(authStore)(gw)
+
+	// Milestone 6's per-registered-server routing path: resolves
+	// {server_name} against Postgres instead of using a single static
+	// upstream, and additionally requires a per-server OAuth bearer
+	// token on top of the same AgentMesh API key check (Architecture.md
+	// §13). authz.Middleware wraps it exactly as it wraps legacyHandler
+	// above — the AgentMesh-API-key layer is identical either way; only
+	// what happens after it differs.
+	registryStore := registry.NewPostgresStore(pgPool)
+	oauthStore := oauth.NewPostgresStore(pgPool)
+	mcpRouter := router.New(registryStore, oauthStore, limiter, emitter, policyEngine)
+	registryHandler := authz.Middleware(authStore)(mcpRouter)
+
+	mux := http.NewServeMux()
+	mux.Handle(router.RoutePrefix, registryHandler)
+	mux.Handle("/", legacyHandler)
 
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           handler,
+		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

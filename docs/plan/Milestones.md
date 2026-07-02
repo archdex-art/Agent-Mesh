@@ -93,14 +93,14 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 
 ---
 
-## Milestone 6 — Plugin/MCP Ecosystem
+## Milestone 6 — Plugin/MCP Ecosystem (Completed)
 
 **Goals:** ship the MCP Gateway and Registry — the second pillar of AgentMesh's differentiation, and architecturally independent of everything built so far.
 
 **Deliverables:**
-- MCP Registry (Postgres schema + Query API/Console CRUD for server manifests).
-- MCP Gateway: OAuth 2.1 validation, request forwarding, `mcp.call` span emission back to the Collector.
-- Guardrail policy engine v1 (declarative YAML/JSON DSL): rate limits and allow/deny lists only for v1; the WASM-sandboxed custom-policy Innovative feature is explicitly deferred (`Feature Roadmap.md`).
+- MCP Registry (Postgres schema: `mcp_servers`, `guardrail_policies`, `mcp_server_tokens` + Query API CRUD + Console Registry view for server manifests, caller-token issuance, and removal).
+- MCP Gateway: per-registered-server routing (resolved from the Registry instead of one static upstream), OAuth 2.1-compliant caller-facing bearer-token validation scoped per server (opaque, hashed-at-rest tokens — a full authorization-code+PKCE flow was scoped out as not fitting MCP's machine-to-machine calling pattern, matching the spec's own 2026 client-credentials direction), request forwarding, `mcp.call` span emission back to the Collector with caller identity attributed.
+- Guardrail policy engine v1 (declarative YAML/JSON DSL): rate limits (Redis fixed-window, additive `rate_limit:` document field) and allow/deny lists (pre-existing regex engine) for v1; the WASM-sandboxed custom-policy Innovative feature is explicitly deferred (`Feature Roadmap.md`).
 **Risks:** OAuth 2.1 implementation correctness is security-critical and the single highest-stakes piece of code in the whole project — mitigated by using a well-audited OAuth library rather than hand-rolling token validation, and by the Gateway's fail-closed design (`Architecture.md` §17) limiting the blast radius of any auth bug to "requests denied," never "requests wrongly allowed" as the default failure mode. Additionally, framework monkey-patching fragility (e.g., AutoGen callback hooks) will be mitigated by opening OSS PRs for native OpenTelemetry hooks in upstream repositories.
 
 **Dependencies:** Auth Service (minimal version exists from Milestone 2; extended here for OAuth 2.1 caller validation, distinct from AgentMesh's own API-key auth).
