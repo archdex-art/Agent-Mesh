@@ -6,6 +6,7 @@ use (
 	./services/jobs
 	./services/mcp-gateway
 	./services/query-api
+	./services/realtime-gateway
 	./services/replay-engine
 	./shared
 )

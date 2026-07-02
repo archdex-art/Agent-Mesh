@@ -41,11 +41,30 @@ type Server struct {
 	decoder   *Decoder
 	offloader *Offloader
 	writer    SpanWriter
+	publisher SpanPublisher
+}
+
+// SpanPublisher is the realtime fan-out dependency Server notifies after
+// a batch is durably persisted — satisfied by *publisher.Publisher,
+// declared here (not imported as a concrete type) for the same
+// independent-testability reason as SpanWriter above. Optional: a Server
+// with no publisher attached (the zero value, nil) simply skips realtime
+// fan-out, matching Milestone 5's realtime gateway being new,
+// non-load-bearing infrastructure that ingestion must work fine without.
+type SpanPublisher interface {
+	PublishBatch(ctx context.Context, spans []span.Span)
 }
 
 // NewServer returns a ready-to-use Server.
 func NewServer(authStore authkeys.Store, decoder *Decoder, offloader *Offloader, writer SpanWriter) *Server {
 	return &Server{authStore: authStore, decoder: decoder, offloader: offloader, writer: writer}
+}
+
+// SetPublisher attaches a SpanPublisher for realtime fan-out. Optional —
+// call sites (tests, or a deployment without the Realtime Gateway) may
+// leave this unset, in which case Export simply skips the publish step.
+func (s *Server) SetPublisher(p SpanPublisher) {
+	s.publisher = p
 }
 
 // Export implements TraceServiceServer.Export: authenticate the caller,
@@ -96,6 +115,14 @@ func (s *Server) Export(ctx context.Context, req *collectorpb.ExportTraceService
 			return nil, status.Error(codes.Unavailable, "trace store temporarily unavailable")
 		}
 		return nil, status.Error(codes.Internal, "failed to persist spans")
+	}
+
+	// Best-effort realtime fan-out, after persistence has already
+	// succeeded: a slow/unavailable Realtime Gateway/Redis must never
+	// affect the ingestion response, per SpanPublisher's documented
+	// contract above.
+	if s.publisher != nil {
+		s.publisher.PublishBatch(ctx, decoded)
 	}
 
 	resp := &collectorpb.ExportTraceServiceResponse{}

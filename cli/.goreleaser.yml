@@ -1,0 +1,66 @@
+# GoReleaser config for the `agentmesh` CLI (Technical Roadmap.md §10:
+# "distributed as prebuilt binaries per platform (GitHub Releases) plus a
+# Homebrew formula, avoiding any requirement to install Go to use the
+# CLI"). Run from within cli/: `goreleaser release --clean`.
+version: 2
+
+project_name: agentmesh
+
+builds:
+  - id: agentmesh
+    main: ./cmd
+    binary: agentmesh
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}}
+
+archives:
+  - id: agentmesh
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+brews:
+  - name: agentmesh
+    homepage: "https://github.com/agentmesh/agentmesh"
+    description: "AgentMesh CLI — local developer workflows for a self-hosted AgentMesh install"
+    license: "Apache-2.0"
+    repository:
+      owner: agentmesh
+      name: homebrew-tap
+    directory: Formula
+    install: |
+      bin.install "agentmesh"
+    test: |
+      system "#{bin}/agentmesh --help"
+
+release:
+  github:
+    owner: agentmesh
+    name: agentmesh
+  prerelease: auto

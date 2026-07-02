@@ -8,8 +8,23 @@ on:
 
 jobs:
   go-test:
-    name: Go Lint & Test
+    name: Go Lint & Test (${{ matrix.module }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - shared
+          - cli
+          - services/collector
+          - services/query-api
+          - services/mcp-gateway
+          - services/replay-engine
+          - services/jobs
+          - services/realtime-gateway
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
@@ -17,6 +32,7 @@ jobs:
         with:
           go-version: '1.25.x'
           cache: true
+          cache-dependency-path: ${{ matrix.module }}/go.sum
       - name: Vet
         run: go vet ./...
       - name: Test
@@ -80,5 +96,29 @@ jobs:
       - name: Lint
         run: npx oxlint src
         
+      - name: Build
+        run: npm run build
+
+  web-console-test:
+    name: Web Console Build & Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/console
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/console/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npx oxlint src
+
       - name: Build
         run: npm run build

@@ -76,7 +76,7 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 
 ---
 
-## Milestone 5 — Terminal Experience
+## Milestone 5 — Terminal Experience (Completed)
 
 **Goals:** ship the `agentmesh` CLI as a first-class client, targeting the "Terminal Applications" differentiation identified in the original portfolio strategy.
 

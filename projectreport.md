@@ -1,14 +1,14 @@
 # AgentMesh Project Report
 
 **Date:** July 2026  
-**Status:** MVP Launched (Milestone 4 of 8 Complete)
+**Status:** Post-MVP (Milestone 5 of 8 Complete)
 
 ## Executive Summary
 AgentMesh is a framework-agnostic control plane for AI agents that provides execution tracing, deterministic replay, MCP-native governance, and cost intelligence. 
-The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, completed reference integrations for the top four agent frameworks, and crossed the MVP ship line by delivering the Memory System and Web Console.
+The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, completed reference integrations for the top four agent frameworks, crossed the MVP ship line with the Memory System and Web Console, and shipped the terminal/CLI experience with live realtime tracing.
 
 ---
-## 🟢 Completed Work (Milestones 1–4)
+## 🟢 Completed Work (Milestones 1–5)
 
 ### Milestone 1: Foundation
 * **Monorepo Architecture:** Scaffolded the Go services, Python/TS SDKs, web apps, and schema definitions.
@@ -35,18 +35,21 @@ The project has successfully laid its foundational data models, established the 
 * **Engineering Excellence (CI/CD):** Implemented GitHub Actions CI/CD workflows covering Go, Python, and Web codebases, creating a secure gateway before merging to `main`.
 * **SDK Polish:** Enhanced the `SpanTracker` interface (`set_input()`), empowering deeper introspection into tool calls mid-flight.
 
+### Milestone 5: Terminal Experience
+* **Realtime Gateway:** New Go service (`services/realtime-gateway`) bridging Collector-published Redis pub/sub span events to live WebSocket sessions, with lazy per-project subscription lifecycle (only pays for a Redis subscription while a client is actually listening).
+* **Collector Realtime Publish:** Collector now publishes a lightweight span event to Redis immediately after a successful ClickHouse write — best-effort, never blocking or failing ingestion if Redis is unavailable.
+* **`agentmesh` CLI:** New Go CLI (Cobra + Bubble Tea) with `agentmesh tail --project <id>` (live-streaming terminal view of spans as they arrive) and `agentmesh mcp validate <manifest.yaml>` (structural linter for MCP server registration manifests, built ahead of the Registry/Gateway itself so the same validation logic is reused in Milestone 6).
+* **CLI Distribution:** GoReleaser config + GitHub Actions release workflow producing cross-platform (Linux/macOS/Windows, amd64/arm64) binaries and a Homebrew formula on `cli-v*` tags.
+* **Deployment Completeness:** Wired both `realtime-gateway` and the previously-orphaned `jobs` worker (Milestone 4) into `docker-compose.yml` with Dockerfiles, and fixed a broken CI job (`go test ./...` at the repo root silently failed under the multi-module `go.work` layout) by matrixing Go tests per module.
+
 ### Additional Completed Work
 * **Marketing Site:** Built a responsive, polished landing page (React, Tailwind v4, Framer Motion) communicating the product vision, linking directly to the repository and documentation.
 
 ---
 
-## 🟡 Immediate Next Step: Milestone 5
+## 🟡 Immediate Next Step: Milestone 6
 
-**Milestone 5 — Terminal Experience**
-* `agentmesh tail` CLI for live-streaming spans via a new **Realtime Gateway** (Redis pub/sub -> WebSocket fan-out).
-* CLI-based MCP server manifest validation.
-
-### Milestone 6: Plugin / MCP Ecosystem
+**Milestone 6 — Plugin/MCP Ecosystem**
 * **MCP Registry:** Postgres-backed catalog of approved MCP servers.
 * **MCP Gateway:** A reverse proxy adding OAuth 2.1 authentication, audit trails, and declarative guardrail policies (rate limits, allow/deny lists) to any standard MCP server.
 

@@ -1,12 +1,13 @@
 # Local/self-host single-node profile (Technical Roadmap.md §11). Brings up
 # every storage dependency AgentMesh's services need — Postgres (control
 # plane), ClickHouse (trace store), Redis (pub/sub + rate limiting), MinIO
-# (S3-compatible blob storage) — plus, as of Milestone 2, the Collector and
-# Query API services themselves, each depending on the storage layer's
-# health checks so they never start against a not-yet-ready dependency.
-# Services still unimplemented (realtime-gateway, mcp-gateway, ...) are not
-# pre-declared here — this file never carries stanzas for code that does
-# not exist yet.
+# (S3-compatible blob storage) — plus the Collector, Query API, Realtime
+# Gateway, background Jobs worker, and Web Console/Replay Engine services,
+# each depending on the storage layer's health checks so they never start
+# against a not-yet-ready dependency. Services still unimplemented
+# (mcp-gateway is built but not yet wired here pending Milestone 6's
+# Registry) are not pre-declared here — this file never carries stanzas
+# for code that does not exist yet.
 #
 # Host ports are env-overridable (`${VAR:-default}`) rather than hardcoded:
 # a developer machine that already runs Postgres/Redis on the standard ports
@@ -101,6 +102,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       AGENTMESH_COLLECTOR_GRPC_ADDR: ":4317"
       AGENTMESH_CLICKHOUSE_ADDR: "clickhouse:9000"
@@ -111,6 +114,7 @@ services:
       AGENTMESH_MINIO_ACCESS_KEY: "agentmesh"
       AGENTMESH_MINIO_SECRET_KEY: "agentmesh-dev-secret"
       AGENTMESH_MINIO_BUCKET: "agentmesh-blobs"
+      AGENTMESH_REDIS_ADDR: "redis:6379" # for the realtime-gateway span-event publish path (Milestone 5)
     ports:
       - "${AGENTMESH_COLLECTOR_PORT:-4317}:4317"
 
@@ -132,6 +136,36 @@ services:
     ports:
       - "${AGENTMESH_QUERYAPI_PORT:-8080}:8080"
 
+  realtime-gateway:
+    build:
+      context: ..
+      dockerfile: services/realtime-gateway/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AGENTMESH_REALTIME_HTTP_ADDR: ":8081"
+      AGENTMESH_POSTGRES_DSN: "postgres://agentmesh:agentmesh@postgres:5432/agentmesh"
+      AGENTMESH_REDIS_ADDR: "redis:6379"
+    ports:
+      - "${AGENTMESH_REALTIME_PORT:-8081}:8081"
+
+  jobs:
+    build:
+      context: ..
+      dockerfile: services/jobs/Dockerfile
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      AGENTMESH_POSTGRES_URL: "postgres://agentmesh:agentmesh@postgres:5432/agentmesh?sslmode=disable"
+      AGENTMESH_CLICKHOUSE_ADDR: "clickhouse:9000"
+    # No exposed ports: jobs is a background worker with no HTTP surface
+    # (Architecture.md §8's internal job queue, Milestone 4).
 
   console:
     build:

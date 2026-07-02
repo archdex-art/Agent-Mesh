@@ -18,6 +18,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/agentmesh/agentmesh/services/collector/internal/blobstore"
 	"github.com/agentmesh/agentmesh/services/collector/internal/ingest"
+	"github.com/agentmesh/agentmesh/services/collector/internal/publisher"
 	"github.com/agentmesh/agentmesh/services/collector/internal/writer"
 	"github.com/agentmesh/agentmesh/shared/authkeys"
 	"github.com/agentmesh/agentmesh/shared/config"
@@ -25,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/redis/go-redis/v9"
 	collectorpb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/grpc"
 )
@@ -45,6 +47,7 @@ type serviceConfig struct {
 	MinIOAccessKey     string `env:"AGENTMESH_MINIO_ACCESS_KEY" yaml:"minio_access_key"`
 	MinIOSecretKey     string `env:"AGENTMESH_MINIO_SECRET_KEY" yaml:"minio_secret_key"`
 	MinIOBucket        string `env:"AGENTMESH_MINIO_BUCKET" yaml:"minio_bucket"`
+	RedisAddr          string `env:"AGENTMESH_REDIS_ADDR" yaml:"redis_addr"`
 }
 
 func main() {
@@ -68,6 +71,7 @@ func run(logger *slog.Logger) error {
 		MinIOAccessKey:     "agentmesh",
 		MinIOSecretKey:     "agentmesh-dev-secret",
 		MinIOBucket:        "agentmesh-blobs",
+		RedisAddr:          "localhost:16379", // matches deploy/docker-compose.yml's redis port mapping
 	}
 	if err := config.NewLoader().Load(&cfg, os.Getenv("AGENTMESH_CONFIG_FILE")); err != nil {
 		return fmt.Errorf("loading config: %w", err)
@@ -119,10 +123,26 @@ func run(logger *slog.Logger) error {
 	}
 	logger.Info("connected to minio", slog.String("bucket", cfg.MinIOBucket))
 
+	// Realtime fan-out is best-effort infrastructure (SpanPublisher's
+	// documented contract): a Redis connection failure here logs a
+	// warning and disables live-tailing rather than failing Collector
+	// startup, since ingestion must keep working even if the Realtime
+	// Gateway's dependency is unavailable.
+	redisClient := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	if err := redisClient.Ping(ctx).Err(); err != nil {
+		logger.Warn("redis unavailable, realtime fan-out disabled", slog.String("addr", cfg.RedisAddr), slog.Any("err", err))
+		redisClient = nil
+	} else {
+		logger.Info("connected to redis", slog.String("addr", cfg.RedisAddr))
+	}
+
 	spanWriter := writer.New(chConn)
 	decoder := ingest.NewDecoder()
 	offloader := ingest.NewOffloader(blobClient)
 	server := ingest.NewServer(authStore, decoder, offloader, spanWriter)
+	if redisClient != nil {
+		server.SetPublisher(publisher.New(redisClient, logger))
+	}
 
 	lis, err := net.Listen("tcp", cfg.GRPCAddr)
 	if err != nil {

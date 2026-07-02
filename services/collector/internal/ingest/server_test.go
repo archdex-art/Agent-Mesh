@@ -43,6 +43,17 @@ func (f *fakeSpanWriter) WriteBatch(ctx context.Context, spans []span.Span) erro
 	return nil
 }
 
+// fakeSpanPublisher satisfies SpanPublisher without a live Redis
+// connection, letting server tests assert the realtime fan-out call
+// happens (and only after a successful write) without live infra.
+type fakeSpanPublisher struct {
+	published []span.Span
+}
+
+func (f *fakeSpanPublisher) PublishBatch(ctx context.Context, spans []span.Span) {
+	f.published = append(f.published, spans...)
+}
+
 // fakeBlobStore satisfies BlobStore without any real object storage,
 // letting server tests exercise the offload wiring without live infra
 // (Phase 3's "independently testable" standard).
@@ -125,6 +136,79 @@ func TestExportSucceedsAndWritesSpans(t *testing.T) {
 	}
 	if len(writer.written) != 1 {
 		t.Fatalf("writer received %d spans, want 1", len(writer.written))
+	}
+}
+
+func TestExportPublishesToRealtimeFanoutAfterSuccessfulWrite(t *testing.T) {
+	projectID := mustProjectID(t)
+	authStore := &fakeAuthStore{record: authkeys.Record{ProjectID: projectID, Role: authkeys.RoleIngest}}
+	writer := &fakeSpanWriter{}
+	pub := &fakeSpanPublisher{}
+	srv := NewServer(authStore, NewDecoder(), NewOffloader(&fakeBlobStore{}), writer)
+	srv.SetPublisher(pub)
+
+	otlpSpan, _, _ := wellFormedSpan(t, projectID)
+	req := &collectorpb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{
+			{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{otlpSpan}}}},
+		},
+	}
+
+	ctx := withAPIKey(context.Background(), "am_live_validkey1234567")
+	if _, err := srv.Export(ctx, req); err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if len(pub.published) != 1 {
+		t.Fatalf("publisher received %d spans, want 1", len(pub.published))
+	}
+}
+
+func TestExportSkipsFanoutWhenWriteFails(t *testing.T) {
+	// A publisher attached to a Server whose write fails must never be
+	// notified — publishing a span that was never durably persisted
+	// would let a live-tail session see data the Query API can't answer
+	// questions about later.
+	projectID := mustProjectID(t)
+	authStore := &fakeAuthStore{record: authkeys.Record{ProjectID: projectID, Role: authkeys.RoleIngest}}
+	writer := &fakeSpanWriter{err: unavailableErr()}
+	pub := &fakeSpanPublisher{}
+	srv := NewServer(authStore, NewDecoder(), NewOffloader(&fakeBlobStore{}), writer)
+	srv.SetPublisher(pub)
+
+	otlpSpan, _, _ := wellFormedSpan(t, projectID)
+	req := &collectorpb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{
+			{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{otlpSpan}}}},
+		},
+	}
+
+	ctx := withAPIKey(context.Background(), "am_live_validkey1234567")
+	_, _ = srv.Export(ctx, req)
+
+	if len(pub.published) != 0 {
+		t.Fatalf("publisher received %d spans, want 0 (write failed)", len(pub.published))
+	}
+}
+
+func TestExportWithoutPublisherAttachedStillSucceeds(t *testing.T) {
+	// SetPublisher is optional (SpanPublisher's documented contract) —
+	// a Server with none attached must behave exactly as before
+	// Milestone 5 introduced realtime fan-out.
+	projectID := mustProjectID(t)
+	authStore := &fakeAuthStore{record: authkeys.Record{ProjectID: projectID, Role: authkeys.RoleIngest}}
+	writer := &fakeSpanWriter{}
+	srv := NewServer(authStore, NewDecoder(), NewOffloader(&fakeBlobStore{}), writer)
+
+	otlpSpan, _, _ := wellFormedSpan(t, projectID)
+	req := &collectorpb.ExportTraceServiceRequest{
+		ResourceSpans: []*tracepb.ResourceSpans{
+			{ScopeSpans: []*tracepb.ScopeSpans{{Spans: []*tracepb.Span{otlpSpan}}}},
+		},
+	}
+
+	ctx := withAPIKey(context.Background(), "am_live_validkey1234567")
+	if _, err := srv.Export(ctx, req); err != nil {
+		t.Fatalf("Export: %v", err)
 	}
 }
 
