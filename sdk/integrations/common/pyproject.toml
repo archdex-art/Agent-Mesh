@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentmesh-integrations-common"
+version = "0.1.0"
+description = "Shared helpers for AgentMesh's framework-agnostic reference integrations (Milestone 3)."
+requires-python = ">=3.9"
+dependencies = [
+    "agentmesh-sdk"
+]
+
+[tool.setuptools.packages.find]
+include = ["agentmesh_integrations_common*"]
+
+[tool.uv.sources]
+agentmesh-sdk = { path = "../../python", editable = true }

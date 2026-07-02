@@ -1,0 +1,10 @@
+# Example guardrail policy, matching docs/plan/MCP_Gateway_Architecture.md
+# §3.3. Referenced via AGENTMESH_MCPGATEWAY_POLICY_FILE.
+policies:
+  - name: prevent_destructive_sql
+    target_tools: ["execute_query", "run_sql"]
+    action: deny
+    rules:
+      - param_matches:
+          param: "sql"
+          pattern: "(?i)(DROP|DELETE|TRUNCATE|ALTER)"

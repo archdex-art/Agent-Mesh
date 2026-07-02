@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentmesh-langgraph"
+version = "0.1.0"
+description = "AgentMesh reference integration for LangGraph (Milestone 3)."
+requires-python = ">=3.9"
+dependencies = [
+    "agentmesh-sdk",
+    "agentmesh-integrations-common",
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["agentmesh_langgraph*"]
+
+[tool.uv.sources]
+agentmesh-sdk = { path = "../../python", editable = true }
+agentmesh-integrations-common = { path = "../common", editable = true }

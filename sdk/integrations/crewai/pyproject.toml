@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentmesh-crewai"
+version = "0.1.0"
+description = "AgentMesh reference integration for CrewAI (Milestone 3)."
+requires-python = ">=3.9"
+dependencies = [
+    "agentmesh-sdk",
+    "agentmesh-integrations-common",
+    "crewai>=1.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["agentmesh_crewai*"]
+
+[tool.uv.sources]
+agentmesh-sdk = { path = "../../python", editable = true }
+agentmesh-integrations-common = { path = "../common", editable = true }

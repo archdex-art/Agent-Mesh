@@ -1,0 +1,10 @@
+go 1.25.0
+
+use (
+	./cli
+	./services/collector
+	./services/mcp-gateway
+	./services/query-api
+	./services/replay-engine
+	./shared
+)

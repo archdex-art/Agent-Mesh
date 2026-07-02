@@ -1,0 +1,23 @@
+# Go
+*.test
+/bin/
+
+# Node (web/console, sdk/typescript)
+node_modules/
+dist/
+.env
+.env.local
+
+# Python (sdk/python)
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local dev artifacts
+*.log

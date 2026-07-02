@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentmesh-autogen"
+version = "0.1.0"
+description = "AgentMesh reference integration for AutoGen (Milestone 3)."
+requires-python = ">=3.9"
+dependencies = [
+    "agentmesh-sdk",
+    "agentmesh-integrations-common",
+    "ag2>=0.14.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["agentmesh_autogen*"]
+
+[tool.uv.sources]
+agentmesh-sdk = { path = "../../python", editable = true }
+agentmesh-integrations-common = { path = "../common", editable = true }
