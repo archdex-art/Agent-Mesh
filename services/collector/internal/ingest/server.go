@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/agentmesh/agentmesh/services/collector/internal/cost"
 	"github.com/agentmesh/agentmesh/shared/authkeys"
 	amerrors "github.com/agentmesh/agentmesh/shared/errors"
 	"github.com/agentmesh/agentmesh/shared/span"
@@ -67,6 +68,13 @@ func (s *Server) Export(ctx context.Context, req *collectorpb.ExportTraceService
 	}
 
 	decoded, decodeErrs := s.decoder.DecodeResourceSpans(req.GetResourceSpans(), record.ProjectID)
+
+	// Compute Cost USD before offload/persistence
+	for i := range decoded {
+		if decoded[i].CostUSD == nil { // Don't override if SDK already set it (e.g. tool.call)
+			decoded[i].CostUSD = cost.Compute(decoded[i])
+		}
+	}
 
 	// Per docs/otlp-mapping.md's corrected "Payload size threshold": the
 	// Collector, not the exporter, decides whether a payload is stored

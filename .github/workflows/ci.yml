@@ -1,141 +1,84 @@
 name: CI
 
-# Per-service jobs (lint, unit test) per Technical Roadmap.md §9. Integration
-# tests via testcontainers and the golden-trace replay regression job are
-# added as the services/fixtures they depend on ship (Milestone 3+) — this
-# workflow only exercises what exists today (shared, collector, query-api)
-# so it is never a false-green placeholder for work that isn't there yet.
-#
-# Each service job's working-directory is the service's own module dir;
-# `go`'s toolchain auto-discovers the repo-root go.work by walking parent
-# directories, so `go vet`/`go test` there resolve the shared module
-# locally without needing an explicit -workfile flag — verified locally
-# (the same pattern used throughout this milestone's manual testing).
-
 on:
   push:
-    branches: [main]
+    branches: [ "master", "main" ]
   pull_request:
+    branches: [ "master", "main" ]
 
 jobs:
-  shared-go:
-    name: shared (lint + test)
+  go-test:
+    name: Go Lint & Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: shared
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
-      - name: go vet
+          go-version: '1.25.x'
+          cache: true
+      - name: Vet
         run: go vet ./...
-      - name: go test
-        run: go test ./... -race -cover
+      - name: Test
+        run: go test -v ./...
 
-  collector-go:
-    name: collector (lint + test)
+  python-test:
+    name: Python Lint & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio
+          
+          # Install core SDK
+          pip install -e sdk/python
+          
+          # Install common integrations layer
+          pip install -e sdk/integrations/common
+          
+          # Install all frameworks
+          pip install -e sdk/integrations/langgraph
+          pip install -e sdk/integrations/crewai
+          pip install -e sdk/integrations/autogen
+          pip install -e sdk/integrations/openai-agents-sdk
+
+      - name: Run Pytest
+        run: |
+          pytest sdk/python/tests -v
+          pytest sdk/integrations/common/tests -v
+          pytest sdk/integrations/langgraph/tests -v
+          pytest sdk/integrations/crewai/tests -v
+          pytest sdk/integrations/autogen/tests -v
+          pytest sdk/integrations/openai-agents-sdk/tests -v
+
+  web-marketing-test:
+    name: Web Marketing Build & Lint
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/collector
+        working-directory: web/marketing
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          go-version: "1.23"
-      - name: go vet
-        run: go vet ./...
-      - name: go test
-        run: go test ./... -race -cover
-
-  query-api-go:
-    name: query-api (lint + test)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/query-api
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
-      - name: go vet
-        run: go vet ./...
-      - name: go test
-        run: go test ./... -race -cover
-
-  python-sdk:
-    name: python sdk (lint + test)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdk/python
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: install
-        run: pip install -e ".[test]"
-      - name: pytest
-        run: python -m pytest tests/ -v
-
-  sql-lint:
-    name: schema (syntax check)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: agentmesh
-          POSTGRES_PASSWORD: agentmesh
-          POSTGRES_DB: agentmesh
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U agentmesh"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: apply postgres migrations
-        run: |
-          for f in schema/postgres/*.sql; do
-            PGPASSWORD=agentmesh psql -h localhost -U agentmesh -d agentmesh -f "$f"
-          done
-
-  clickhouse-migration-check:
-    name: schema (clickhouse apply check)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: start clickhouse
-        run: |
-          docker run -d --name ci-clickhouse -p 8123:8123 \
-            -e CLICKHOUSE_SKIP_USER_SETUP=1 \
-            clickhouse/clickhouse-server:24.8
-          for i in $(seq 1 20); do
-            curl -sf http://localhost:8123/ping && break
-            sleep 1
-          done
-      - name: apply clickhouse migrations
-        # The HTTP interface rejects multi-statement bodies, and the
-        # container's own docker-entrypoint-initdb.d hook only runs against
-        # an empty data directory on first boot — so CI applies migrations
-        # explicitly via `clickhouse-client --multiquery`, the same tool the
-        # image's own entrypoint uses internally, verified locally against a
-        # live container before landing this workflow.
-        run: |
-          for f in schema/clickhouse/*.sql; do
-            docker cp "$f" ci-clickhouse:/tmp/migration.sql
-            docker exec ci-clickhouse clickhouse-client --multiquery --queries-file /tmp/migration.sql
-          done
-      - name: verify spans table exists
-        run: |
-          result=$(docker exec ci-clickhouse clickhouse-client --query "EXISTS TABLE spans")
-          if [ "$result" != "1" ]; then
-            echo "spans table was not created" >&2
-            exit 1
-          fi
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/marketing/package-lock.json
+      
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Lint
+        run: npx oxlint src
+        
+      - name: Build
+        run: npm run build

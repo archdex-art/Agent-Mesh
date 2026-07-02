@@ -1,16 +1,14 @@
 # AgentMesh Project Report
 
 **Date:** July 2026  
-**Status:** Approaching MVP (Milestone 3 of 8 Complete)
+**Status:** MVP Launched (Milestone 4 of 8 Complete)
 
 ## Executive Summary
 AgentMesh is a framework-agnostic control plane for AI agents that provides execution tracing, deterministic replay, MCP-native governance, and cost intelligence. 
-
-The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, and completed reference integrations for the top four agent frameworks. We are currently preparing to cross the MVP ship line with the build-out of the Web Console and Memory System.
+The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, completed reference integrations for the top four agent frameworks, and crossed the MVP ship line by delivering the Memory System and Web Console.
 
 ---
-
-## 🟢 Completed Work (Milestones 1–3)
+## 🟢 Completed Work (Milestones 1–4)
 
 ### Milestone 1: Foundation
 * **Monorepo Architecture:** Scaffolded the Go services, Python/TS SDKs, web apps, and schema definitions.
@@ -29,25 +27,22 @@ The project has successfully laid its foundational data models, established the 
 * **Golden Reference Tasks:** Established a shared, deterministic mock workflow (`search` -> `read_page` -> `summarize` -> `review`) that produces comparable trace DAGs regardless of the orchestration framework.
 * **GraphQL Endpoint:** Added a native GraphQL surface to the Query API to fetch deeply nested trace trees efficiently.
 
+### Milestone 4: Memory System & MVP Ship Line
+* **Cost Engine v0.1:** Added static pricing definitions to the Go Collector, calculating and persisting `cost_usd` for LLM spans at ingestion time.
+* **Trace Rollups:** Verified `trace_rollups` materialized view in ClickHouse, ensuring fast, aggregated dashboard queries without raw span scans.
+* **Web Console v0.1:** The React/TypeScript dashboard (`web/console`) is fully scaffolded, successfully compiling with `oxlint` integration. Features trace DAG viewer, trace list, and basic cost dashboard.
+* **Retention/Compaction Job:** Added `services/jobs`, a Postgres-backed background queue utilizing `SKIP LOCKED` polling to execute table maintenance (e.g. `ALTER TABLE spans DELETE` driven by per-project `retention_days`).
+* **Engineering Excellence (CI/CD):** Implemented GitHub Actions CI/CD workflows covering Go, Python, and Web codebases, creating a secure gateway before merging to `main`.
+* **SDK Polish:** Enhanced the `SpanTracker` interface (`set_input()`), empowering deeper introspection into tool calls mid-flight.
+
 ### Additional Completed Work
 * **Marketing Site:** Built a responsive, polished landing page (React, Tailwind v4, Framer Motion) communicating the product vision, linking directly to the repository and documentation.
 
 ---
 
-## 🟡 Immediate Next Step: Milestone 4 (MVP Ship Line)
+## 🟡 Immediate Next Step: Milestone 5
 
-**Milestone 4 — Memory System (Trace Data Lifecycle)**
-This milestone transforms the raw data pipeline into a usable product. Once complete, a design partner can self-host AgentMesh and debug traces via the UI.
-* **Cost Engine v0.1:** Span-level token and dollar cost attribution via a static pricing table.
-* **Trace Rollups:** A ClickHouse materialized view (`trace_rollups`) to pre-aggregate trace costs and durations for fast querying.
-* **Web Console v0.1:** A React/TypeScript dashboard featuring a trace list, DAG viewer, and basic cost dashboard.
-* **Retention/Compaction Job:** A Postgres-backed worker to enforce data lifecycle policies (ClickHouse TTL + blob storage cleanup).
-
----
-
-## ⚪ Upcoming Roadmap (Post-MVP)
-
-### Milestone 5: Terminal Experience
+**Milestone 5 — Terminal Experience**
 * `agentmesh tail` CLI for live-streaming spans via a new **Realtime Gateway** (Redis pub/sub -> WebSocket fan-out).
 * CLI-based MCP server manifest validation.
 

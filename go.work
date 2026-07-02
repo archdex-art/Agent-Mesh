@@ -1,8 +1,9 @@
-go 1.25.0
+go 1.26.4
 
 use (
 	./cli
 	./services/collector
+	./services/jobs
 	./services/mcp-gateway
 	./services/query-api
 	./services/replay-engine

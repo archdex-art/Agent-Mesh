@@ -195,6 +195,22 @@ class SpanTracker:
         # `_StructuralNode` entries carry nothing to export; popping the
         # tracking entry above is the entirety of "finishing" one.
 
+    def set_input(self, external_id: str, input_data: str) -> None:
+        """Set the `input` field of a tracked real span before it finishes.
+        
+        Safe to call on structural (`kind=None`) nodes (it will be ignored).
+        Raises `UnknownSpanError` if `external_id` is unknown.
+        """
+        try:
+            entry = self._tracked[external_id]
+        except KeyError as exc:
+            raise UnknownSpanError(
+                f"SpanTracker.set_input() called with unknown external_id={external_id!r}"
+            ) from exc
+            
+        if isinstance(entry, Span):
+            entry.set_input(input_data)
+
     def active_trace_id(self, external_id: str) -> str | None:
         """Return the `trace_id` of a still-open tracked span, or `None`
         if ``external_id`` isn't currently tracked.

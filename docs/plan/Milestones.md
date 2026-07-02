@@ -39,7 +39,7 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 
 ---
 
-## Milestone 3 — Agent Runtime (Framework Integrations)
+## Milestone 3 — Agent Runtime (Framework Integrations) (Completed)
 
 **Goals:** prove the "framework-agnostic" claim with real, working adapters — and in doing so, validate Assumption A1 and A2 from `Vision.md`.
 
@@ -56,11 +56,13 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 
 ---
 
-## Milestone 4 — Memory System (Trace Data Lifecycle)
+## Milestone 4 — Memory System (Trace Data Lifecycle) (Completed)
 
 **Goals:** move from "traces exist" to "traces are production-viable" — retention, compaction, and the Web Console's first real UI.
 
 **Deliverables:**
+- GitHub Actions CI/CD pipeline implementation (automated testing, linting, Go build checks) to enforce code quality before MVP launch.
+- SDK Polish: Expand `SpanTracker` API with `.set_input()` to ensure tool arguments can be captured before execution crashes.
 - Retention/compaction background job (Postgres-backed job queue per `Architecture.md` §8) enforcing `projects.retention_days` via ClickHouse TTL and blob-store lifecycle rules.
 - Web Console v0.1: trace list, trace DAG viewer, basic cost dashboard (the three P0 UI features from `Feature Roadmap.md`).
 - `trace_rollups` materialized view for dashboard query performance.
@@ -99,9 +101,7 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 - MCP Registry (Postgres schema + Query API/Console CRUD for server manifests).
 - MCP Gateway: OAuth 2.1 validation, request forwarding, `mcp.call` span emission back to the Collector.
 - Guardrail policy engine v1 (declarative YAML/JSON DSL): rate limits and allow/deny lists only for v1; the WASM-sandboxed custom-policy Innovative feature is explicitly deferred (`Feature Roadmap.md`).
-- `agentmesh mcp register` CLI command.
-
-**Risks:** OAuth 2.1 implementation correctness is security-critical and the single highest-stakes piece of code in the whole project — mitigated by using a well-audited OAuth library rather than hand-rolling token validation, and by the Gateway's fail-closed design (`Architecture.md` §17) limiting the blast radius of any auth bug to "requests denied," never "requests wrongly allowed" as the default failure mode.
+**Risks:** OAuth 2.1 implementation correctness is security-critical and the single highest-stakes piece of code in the whole project — mitigated by using a well-audited OAuth library rather than hand-rolling token validation, and by the Gateway's fail-closed design (`Architecture.md` §17) limiting the blast radius of any auth bug to "requests denied," never "requests wrongly allowed" as the default failure mode. Additionally, framework monkey-patching fragility (e.g., AutoGen callback hooks) will be mitigated by opening OSS PRs for native OpenTelemetry hooks in upstream repositories.
 
 **Dependencies:** Auth Service (minimal version exists from Milestone 2; extended here for OAuth 2.1 caller validation, distinct from AgentMesh's own API-key auth).
 
@@ -136,9 +136,8 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 **Deliverables:**
 - ClickHouse query performance pass (explain-analyze the Console's actual query patterns, add indexes/materialized views as needed).
 - Load testing of the full ingestion path at a target volume (defined based on any design-partner data gathered by this point, or a documented synthetic target otherwise).
-- Security review pass: dependency audit, secrets handling review, the MCP Gateway's auth path specifically re-reviewed given its Milestone 6 risk flag.
 - Public documentation: getting-started guide, SDK API reference, self-hosting guide.
-- Web Console UX polish: empty states, error states, onboarding flow.
+- Security review pass: dependency audit, secrets handling review, SOC2-prep data redaction (PII stripping), and the MCP Gateway's auth path specifically re-reviewed given its Milestone 6 risk flag.
 - Helm chart for production Kubernetes deployment (the `docker-compose` self-host path already exists from Milestone 1; this milestone adds the production-grade alternative per `Technical Roadmap.md` §11).
 
 **Risks:** "polish" milestones are notorious scope traps — mitigated by defining a fixed, written punch list at the *start* of this milestone (derived from design-partner feedback gathered during M1–M7, if any, or from the developer's own dogfooding) rather than open-ended iteration.
