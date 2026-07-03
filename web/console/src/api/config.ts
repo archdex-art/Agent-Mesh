@@ -28,6 +28,30 @@ export function authHeaders(): HeadersInit {
   return currentApiKey ? { [API_KEY_HEADER]: currentApiKey } : {};
 }
 
+// Session tokens (from POST /v1/auth/login) are a second, separate
+// credential from the project API key above: they authenticate the new
+// account-management endpoints (/v1/auth/me, /v1/auth/projects, ...) via
+// `Authorization: Bearer <token>`, never `X-AgentMesh-API-Key`. Kept in
+// their own localStorage slot so the two never collide, and deliberately
+// NOT threaded into authHeaders()/apiFetch() above — every other API
+// client in this directory must keep sending exactly the headers it
+// already sends today.
+let currentSessionToken: string = localStorage.getItem('agentmesh_session_token') || '';
+
+export function getSessionToken(): string {
+  return currentSessionToken;
+}
+
+export function setSessionToken(token: string) {
+  currentSessionToken = token;
+  localStorage.setItem('agentmesh_session_token', token);
+}
+
+export function clearSessionToken() {
+  currentSessionToken = '';
+  localStorage.removeItem('agentmesh_session_token');
+}
+
 /** Thrown by the API clients on a non-2xx response. */
 export class ApiError extends Error {
   status: number;
@@ -41,16 +65,12 @@ export class ApiError extends Error {
   }
 }
 
-/** Shared fetch-and-parse-JSON helper with AgentMesh's auth header wired in. */
-export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      ...authHeaders(),
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  });
+/**
+ * Response handling shared by apiFetch and apiFetchWithSession: both hit
+ * the same Query API JSON conventions (non-2xx -> ApiError, 204/empty
+ * body -> undefined), differing only in which credential they attach.
+ */
+async function parseJSONResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new ApiError(res.status, body);
@@ -63,4 +83,36 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
     return undefined as T;
   }
   return JSON.parse(text) as T;
+}
+
+/** Shared fetch-and-parse-JSON helper with AgentMesh's auth header wired in. */
+export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      ...authHeaders(),
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
+  });
+  return parseJSONResponse<T>(res);
+}
+
+/**
+ * Session-authenticated counterpart to apiFetch, for the /v1/auth/*
+ * account-management endpoints only: sends `Authorization: Bearer
+ * <sessionToken>` instead of `X-AgentMesh-API-Key`. A blank sessionToken
+ * (register/login, which establish the session and so have none yet)
+ * simply omits the header rather than sending a bare "Bearer ".
+ */
+export async function apiFetchWithSession<T>(url: string, sessionToken: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
+  });
+  return parseJSONResponse<T>(res);
 }

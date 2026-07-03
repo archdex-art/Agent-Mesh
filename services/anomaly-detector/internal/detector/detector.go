@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"strings"
-	"sync"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/redis/go-redis/v9"
+	"log/slog"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -56,11 +56,11 @@ type Detector struct {
 
 func New(db DB, rdb *redis.Client, logger *slog.Logger) *Detector {
 	return &Detector{
-		db:      db,
-		redis:   rdb,
-		logger:  logger,
-		rules:   make(map[string][]AlertRule),
-		loops:   make(map[string]*loopTracker),
+		db:     db,
+		redis:  rdb,
+		logger: logger,
+		rules:  make(map[string][]AlertRule),
+		loops:  make(map[string]*loopTracker),
 	}
 }
 
@@ -232,7 +232,7 @@ func (d *Detector) triggerAlert(ctx context.Context, ruleID, projectID, traceID,
 	if d.db == nil {
 		return // Ignore for tests where db isn't wired properly
 	}
-	_, err := d.db.Exec(ctx, 
+	_, err := d.db.Exec(ctx,
 		"INSERT INTO alert_events (project_id, rule_id, trace_id, message, status, created_at) VALUES ($1, $2, $3, $4, 'pending', now())",
 		projectID, ruleID, traceID, message,
 	)

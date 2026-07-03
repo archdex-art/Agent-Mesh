@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"io"
 	"log/slog"
 	"net/http"
 	"testing"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 type MockHTTPClient struct {
@@ -40,7 +40,7 @@ func TestWorker_processJob(t *testing.T) {
 		reqMatcher := mock.MatchedBy(func(req *http.Request) bool {
 			return req.URL.String() == "https://hooks.slack.com/services/test"
 		})
-		
+
 		mockResp := &http.Response{
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewReader([]byte("ok"))),
@@ -58,7 +58,7 @@ func TestWorker_processJob(t *testing.T) {
 		reqMatcher := mock.MatchedBy(func(req *http.Request) bool {
 			return req.URL.String() == "https://hooks.slack.com/services/test"
 		})
-		
+
 		mockClient.On("Do", reqMatcher).Return((*http.Response)(nil), errors.New("network timeout"))
 
 		config := []byte(`{"type": "slack", "webhook_url": "https://hooks.slack.com/services/test"}`)
@@ -72,7 +72,7 @@ func TestWorker_processJob(t *testing.T) {
 		reqMatcher := mock.MatchedBy(func(req *http.Request) bool {
 			return req.URL.String() == "https://hooks.slack.com/services/test"
 		})
-		
+
 		mockResp := &http.Response{
 			StatusCode: 500,
 			Body:       io.NopCloser(bytes.NewReader([]byte("error"))),
@@ -87,7 +87,7 @@ func TestWorker_processJob(t *testing.T) {
 
 	t.Run("unsupported channel type", func(t *testing.T) {
 		mockClient.ExpectedCalls = nil
-		
+
 		config := []byte(`{"type": "email"}`)
 		err := w.processJob(ctx, "Alert! High cost", config)
 		assert.ErrorContains(t, err, "unsupported channel type: email")
@@ -96,7 +96,7 @@ func TestWorker_processJob(t *testing.T) {
 
 	t.Run("invalid config JSON", func(t *testing.T) {
 		mockClient.ExpectedCalls = nil
-		
+
 		config := []byte(`{invalid`)
 		err := w.processJob(ctx, "Alert! High cost", config)
 		assert.ErrorContains(t, err, "invalid channel config JSON")

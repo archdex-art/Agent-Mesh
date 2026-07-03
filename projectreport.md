@@ -1,13 +1,25 @@
 # AgentMesh Project Report
 
 **Date:** July 2026  
-**Status:** 100% Complete (Milestone 8 of 8 Complete)
+**Status:** 100% Complete (Milestone 8 of 8) + Hosted Auth (Post-Milestone)
 
 ## Executive Summary
 AgentMesh is a framework-agnostic control plane for AI agents that provides execution tracing, deterministic replay, MCP-native governance, and cost intelligence. 
-The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, completed reference integrations for the top four agent frameworks, crossed the MVP ship line with the Memory System and Web Console, shipped the terminal/CLI experience with live realtime tracing, delivered the MCP Registry + Gateway governance layer, shipped AI Workflows (Replay & Anomalies), and finalized production polish (Helm charts, documentation).
+The project has successfully laid its foundational data models, established the telemetry ingestion pipeline, completed reference integrations for the top four agent frameworks, crossed the MVP ship line with the Memory System and Web Console, shipped the terminal/CLI experience with live realtime tracing, delivered the MCP Registry + Gateway governance layer, shipped AI Workflows (Replay & Anomalies), finalized production polish (Helm charts, documentation), and added real user accounts so the Web Console is now a genuine hosted-product login experience, not just a self-hosted eval tool.
 
 ---
+
+## 🟢 Post-Milestone: Hosted Auth (User Accounts)
+Added on top of the completed 8-milestone roadmap, in direct response to the ask "I want a website where I can use this." Turns the Console from "click one button, get an anonymous project" into a real sign-up/log-in product, while changing nothing about how the existing project/API-key/ingestion model works underneath.
+* **Schema:** New `users` and `sessions` tables (`schema/postgres/006_users.sql`); `projects.owner_user_id` added as a nullable FK so every pre-existing anonymous/test project stays valid with zero backfill.
+* **Query API:** `POST /v1/auth/register`, `POST /v1/auth/login` (bcrypt-hashed passwords, opaque session tokens), `GET /v1/auth/me`, `GET/POST /v1/auth/projects` — a second, additive auth layer (`Authorization: Bearer <session_token>`) that never touches the existing API-key auth (`X-AgentMesh-API-Key`) every other endpoint uses.
+* **Web Console:** Real Sign Up / Log In screens, a project picker/creator, and a "Log out" flow — with the original anonymous `/v1/setup` path kept alive behind a "Continue without an account" link for zero-signup local eval. Live-verified in a real browser: signed up a brand-new user, created a project, confirmed the existing Traces/Cost/Registry views render unchanged, logged out cleanly.
+* **CLI:** `agentmesh login` prompts for email/password (hidden input via `golang.org/x/term`), stores a session + resolved API key in `~/.agentmesh/config.json` (mode `0600`). `tail`/`mcp register` now fall back to this file when `--api-key`/`$AGENTMESH_API_KEY` aren't set — verified end-to-end with a real login-produced config file.
+* **Two real bugs found and fixed during this work:** (1) `setup.go`'s default project name truncated a UUIDv7's time-ordered prefix, so any two projects created within the same ~65-second window collided on the `UNIQUE(name)` constraint — fixed by sourcing the default name from the UUID's random tail instead; (2) a `pflag`/cobra quirk where backtick-wrapped text in a flag's help string gets interpreted as a value-placeholder override, corrupting `--help` output — fixed by switching to single-quotes.
+* **Verification:** All new Go tests (24 across `services/query-api` and `cli`) pass against live Postgres; zero regressions across every pre-existing test in both modules; full browser-driven end-to-end flow (signup → login → create project → use app → logout) verified live, not just asserted.
+
+---
+
 ## 🟢 Completed Work (Milestones 1–8)
 
 ### Milestone 1: Foundation

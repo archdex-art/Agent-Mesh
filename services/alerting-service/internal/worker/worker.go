@@ -95,7 +95,7 @@ func (w *Worker) processNextBatch(ctx context.Context) error {
 
 	for _, j := range jobs {
 		err := w.processJob(ctx, j.Message, j.ChannelConfig)
-		
+
 		status := "delivered"
 		var errorMsg *string
 		if err != nil {

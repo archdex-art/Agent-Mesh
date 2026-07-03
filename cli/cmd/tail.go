@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -29,16 +28,17 @@ workflow from Milestones.md's Milestone 5 success criteria.`,
 
 func init() {
 	tailCmd.Flags().StringVar(&tailProject, "project", "", "Project ID to tail (required)")
-	tailCmd.Flags().StringVar(&tailAPIKey, "api-key", os.Getenv("AGENTMESH_API_KEY"),
-		"AgentMesh API key (defaults to $AGENTMESH_API_KEY)")
+	tailCmd.Flags().StringVar(&tailAPIKey, "api-key", "",
+		"AgentMesh API key (defaults to $AGENTMESH_API_KEY, then the key stored by 'agentmesh login')")
 	tailCmd.Flags().StringVar(&tailGatewayURL, "gateway-url", "http://localhost:8081",
 		"Realtime Gateway base URL")
 	_ = tailCmd.MarkFlagRequired("project")
 }
 
 func runTail(cmd *cobra.Command, args []string) error {
+	tailAPIKey = resolveAPIKey(tailAPIKey)
 	if tailAPIKey == "" {
-		return fmt.Errorf("no API key: pass --api-key or set AGENTMESH_API_KEY")
+		return fmt.Errorf("no API key: pass --api-key, set AGENTMESH_API_KEY, or run `agentmesh login`")
 	}
 
 	client, err := tailclient.Dial(tailGatewayURL, tailAPIKey)

@@ -33,4 +33,5 @@ func Execute() {
 func init() {
 	rootCmd.AddCommand(tailCmd)
 	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(loginCmd)
 }

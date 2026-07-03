@@ -1,13 +1,9 @@
 package rest
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
 
 	amerrors "github.com/agentmesh/agentmesh/shared/errors"
-	"github.com/agentmesh/agentmesh/shared/ids"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,46 +21,23 @@ func (h *SetupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a new Project ID
-	projectID, err := ids.NewProjectID()
-	if err != nil {
-		writeStoreError(w, amerrors.Wrap(amerrors.CodeInternal, "generating project id", err))
-		return
-	}
-
-	// Generate a new API Key
-	rawBytes := make([]byte, 16)
-	if _, err := rand.Read(rawBytes); err != nil {
-		writeStoreError(w, amerrors.Wrap(amerrors.CodeInternal, "generating key bytes", err))
-		return
-	}
-	rawKey := "am_live_" + hex.EncodeToString(rawBytes)
-
-	hash := sha256.Sum256([]byte(rawKey))
-	hashedKey := hex.EncodeToString(hash[:])
-	prefix := rawKey[:12]
-
-	// Insert into Postgres transactionally
 	ctx := r.Context()
 	tx, err := h.pool.Begin(ctx)
 	if err != nil {
 		writeStoreError(w, amerrors.Wrap(amerrors.CodeUnavailable, "starting tx", err))
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once Commit has succeeded; the return value has no recovery action either way
 
-	// We use a unique project name. If "Default Project" exists, we append the ID.
-	projectName := "Project " + projectID.String()[:8]
-
-	_, err = tx.Exec(ctx, `INSERT INTO projects (id, name) VALUES ($1, $2)`, projectID.String(), projectName)
+	// Anonymous: no owning user. schema/postgres/006_users.sql made
+	// projects.owner_user_id nullable specifically so this endpoint
+	// keeps working, completely unmodified from the caller's
+	// perspective, for self-hosted/CI/local-dev use — see
+	// project_provisioning.go for the shared project+key insert logic
+	// this and POST /v1/auth/projects (auth.go) both call.
+	projectID, _, rawKey, err := createProjectAndKey(ctx, tx, nil, "")
 	if err != nil {
-		writeStoreError(w, amerrors.Wrap(amerrors.CodeUnavailable, "inserting project", err))
-		return
-	}
-
-	_, err = tx.Exec(ctx, `INSERT INTO api_keys (id, project_id, hashed_key, prefix, role) VALUES (gen_random_uuid(), $1, $2, $3, 'ingest')`, projectID.String(), hashedKey, prefix)
-	if err != nil {
-		writeStoreError(w, amerrors.Wrap(amerrors.CodeUnavailable, "inserting api key", err))
+		writeStoreError(w, err)
 		return
 	}
 
@@ -74,7 +47,7 @@ func (h *SetupHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]string{
-		"project_id": projectID.String(),
+		"project_id": projectID,
 		"api_key":    rawKey,
 	})
 }

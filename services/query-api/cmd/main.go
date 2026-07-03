@@ -88,6 +88,7 @@ func run(logger *slog.Logger) error {
 	tracesHandler := rest.NewTracesHandler(reader, authz.ProjectIDFromRequest)
 	setupHandler := rest.NewSetupHandler(pgPool)
 	mcpRegistryHandler := rest.NewMCPRegistryHandler(pgPool, authz.ProjectIDFromRequest)
+	authHandler := rest.NewAuthHandler(pgPool)
 	graphqlHandler, err := graphql.NewHandler(reader, authz.ProjectIDFromRequest)
 	if err != nil {
 		return fmt.Errorf("building graphql handler: %w", err)
@@ -99,6 +100,17 @@ func run(logger *slog.Logger) error {
 	mux.Handle("/v1/graphql", authz.Middleware(authStore)(graphqlHandler))
 	mux.Handle("/v1/mcp/", authz.Middleware(authStore)(mcpRegistryHandler))
 	mux.Handle("/v1/setup", setupHandler)
+
+	// New, additive account-management surface (schema/postgres/
+	// 006_users.sql): register/login are reachable with no credentials
+	// at all (a caller cannot present a session to obtain one), while
+	// me/projects require a session token via authz.SessionMiddleware —
+	// a distinct auth layer from authz.Middleware above, never applied
+	// to the API-key-authenticated routes.
+	mux.Handle("/v1/auth/register", authHandler)
+	mux.Handle("/v1/auth/login", authHandler)
+	mux.Handle("/v1/auth/me", authz.SessionMiddleware(pgPool)(authHandler))
+	mux.Handle("/v1/auth/projects", authz.SessionMiddleware(pgPool)(authHandler))
 
 	handler := rest.CORSMiddleware(mux)
 

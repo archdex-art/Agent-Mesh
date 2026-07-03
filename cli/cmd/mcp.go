@@ -60,8 +60,8 @@ func init() {
 	mcpCmd.AddCommand(mcpValidateCmd)
 	mcpCmd.AddCommand(mcpRegisterCmd)
 
-	mcpRegisterCmd.Flags().StringVar(&mcpRegisterAPIKey, "api-key", os.Getenv("AGENTMESH_API_KEY"),
-		"AgentMesh API key (defaults to $AGENTMESH_API_KEY)")
+	mcpRegisterCmd.Flags().StringVar(&mcpRegisterAPIKey, "api-key", "",
+		"AgentMesh API key (defaults to $AGENTMESH_API_KEY, then the key stored by 'agentmesh login')")
 	mcpRegisterCmd.Flags().StringVar(&mcpRegisterQueryAPI, "query-api-url", "http://localhost:8080",
 		"Query API base URL, where the MCP Registry lives")
 	mcpRegisterCmd.Flags().StringVar(&mcpRegisterGatewayURL, "gateway-url", "http://localhost:8090",
@@ -115,8 +115,9 @@ func runMCPRegister(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s: failed validation, fix the errors above before registering", path)
 	}
 
+	mcpRegisterAPIKey = resolveAPIKey(mcpRegisterAPIKey)
 	if mcpRegisterAPIKey == "" {
-		return fmt.Errorf("no API key: pass --api-key or set AGENTMESH_API_KEY")
+		return fmt.Errorf("no API key: pass --api-key, set AGENTMESH_API_KEY, or run `agentmesh login`")
 	}
 
 	m := result.Manifest

@@ -7,6 +7,7 @@ require (
 	github.com/graphql-go/graphql v0.8.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/shopspring/decimal v1.4.0
+	golang.org/x/crypto v0.53.0
 )
 
 require (

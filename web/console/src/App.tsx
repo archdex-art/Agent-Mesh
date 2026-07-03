@@ -4,7 +4,8 @@ import { TraceDAGViewer } from './features/traces/TraceDAGViewer';
 import { CostDashboard } from './features/cost/CostDashboard';
 import { ReplayView } from './features/replay/ReplayView';
 import { RegistryView } from './features/registry/RegistryView';
-import { getApiKey, setApiKey, QUERY_API_URL } from './api/config';
+import { AuthGate } from './features/auth/AuthGate';
+import { clearSessionToken, getApiKey, setApiKey } from './api/config';
 // Minimal state-based view switching rather than react-router: the console
 // has three flat views with a single forward chain (list -> DAG -> replay)
 // and one sibling tab (cost dashboard), so a URL router would add a
@@ -19,49 +20,15 @@ type View =
 function App() {
   const [hasKey, setHasKey] = useState(!!getApiKey());
   const [view, setView] = useState<View>({ name: 'traces' });
-  const [isSettingUp, setIsSettingUp] = useState(false);
-  const [setupError, setSetupError] = useState('');
+
+  function handleLogout() {
+    clearSessionToken();
+    setApiKey('');
+    setHasKey(false);
+  }
 
   if (!hasKey) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-ink">
-        <div className="w-full max-w-md rounded-lg border border-line bg-ink-soft p-8 text-center shadow-lg">
-          <h1 className="mb-4 text-2xl font-semibold text-fog">Welcome to AgentMesh</h1>
-          <p className="mb-8 text-mist">
-            Initialize your workspace to start tracing and debugging AI agents.
-          </p>
-          <button
-            onClick={async () => {
-              setIsSettingUp(true);
-              setSetupError('');
-              try {
-                const res = await fetch(`${QUERY_API_URL}/v1/setup`, { method: 'POST' });
-                if (!res.ok) {
-                  const text = await res.text().catch(() => '');
-                  throw new Error(`Setup failed (${res.status}): ${text}`);
-                }
-                const data = await res.json() as { api_key: string; project_id: string };
-                setApiKey(data.api_key);
-                setHasKey(true);
-              } catch (err: unknown) {
-                setSetupError(err instanceof Error ? err.message : String(err));
-              } finally {
-                setIsSettingUp(false);
-              }
-            }}
-            disabled={isSettingUp}
-            className="rounded bg-cyan px-6 py-2 font-medium text-ink transition-colors hover:bg-cyan/90 disabled:opacity-50"
-          >
-            {isSettingUp ? 'Initializing...' : 'Initialize Workspace'}
-          </button>
-          {setupError && (
-            <div className="mt-4 rounded bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
-              {setupError}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    return <AuthGate onReady={() => setHasKey(true)} />;
   }
 
   return (
@@ -91,6 +58,13 @@ function App() {
               className={view.name === 'registry' ? 'text-cyan' : 'text-mist hover:text-fog'}
             >
               Registry
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="ml-auto text-mist hover:text-fog"
+            >
+              Log out
             </button>
           </nav>
         </div>

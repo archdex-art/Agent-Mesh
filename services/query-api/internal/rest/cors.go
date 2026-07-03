@@ -12,16 +12,18 @@ import "net/http"
 // inspection.
 //
 // Allowing any origin ("*") is acceptable here specifically because this
-// API is authenticated by a static bearer-style API key header, not
-// cookies — CORS's credentialed-request restrictions (which "*" cannot
-// satisfy) exist to protect cookie-based auth from cross-site reads, a
-// concern that does not apply to a header-based key the browser must be
-// explicitly told to send.
+// API is authenticated by static bearer-style headers (X-AgentMesh-API-Key
+// for project-data endpoints, Authorization: Bearer for the session-based
+// account-management endpoints in auth.go), never cookies — CORS's
+// credentialed-request restrictions (which "*" cannot satisfy) exist to
+// protect cookie-based auth from cross-site reads, a concern that does not
+// apply to a header-based credential the browser must be explicitly told
+// to send.
 func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AgentMesh-API-Key")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-AgentMesh-API-Key, Authorization")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

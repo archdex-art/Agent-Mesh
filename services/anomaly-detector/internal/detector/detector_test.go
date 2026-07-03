@@ -2,10 +2,10 @@ package detector
 
 import (
 	"context"
-	"log/slog"
-	"os"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"log/slog"
+	"os"
 	"testing"
 )
 
@@ -38,9 +38,9 @@ func TestEvaluateRule_LoopDetected(t *testing.T) {
 	projectID := "proj-1"
 
 	ev1 := Event{TraceID: "trace-1", Kind: "tool.call", Name: "search"}
-	
+
 	d.evaluateRule(ctx, rule, projectID, ev1)
-	
+
 	key := "trace-1:rule-1"
 	d.stateMu.Lock()
 	tracker := d.loops[key]
@@ -48,20 +48,20 @@ func TestEvaluateRule_LoopDetected(t *testing.T) {
 		t.Fatalf("expected count 1, got %v", tracker)
 	}
 	d.stateMu.Unlock()
-	
+
 	if db.inserted {
 		t.Fatalf("should not have triggered alert yet")
 	}
 
 	d.evaluateRule(ctx, rule, projectID, ev1) // count 2
 	d.evaluateRule(ctx, rule, projectID, ev1) // count 3 (triggers alert)
-	
+
 	d.stateMu.Lock()
 	if d.loops[key].Count != 3 {
 		t.Fatalf("expected count 3, got %d", d.loops[key].Count)
 	}
 	d.stateMu.Unlock()
-	
+
 	if !db.inserted {
 		t.Fatalf("should have triggered alert")
 	}
@@ -81,7 +81,7 @@ func TestEvaluateRule_GuardrailViolation(t *testing.T) {
 	ctx := context.Background()
 
 	ev := Event{TraceID: "trace-1", Kind: "mcp.call", Status: "denied", Name: "fetch_data"}
-	
+
 	d.evaluateRule(ctx, rule, "proj-1", ev)
 
 	if !db.inserted {
