@@ -212,7 +212,7 @@ services:
       # AGENTMESH_MCPGATEWAY_API_KEY=<the returned api_key> in your shell (or
       # a .env file next to this compose file) before `docker compose up
       # mcp-gateway`. The Gateway refuses to start without it.
-      AGENTMESH_MCPGATEWAY_API_KEY: "${AGENTMESH_MCPGATEWAY_API_KEY:?set this to a real API key from POST /v1/setup — see README.md}"
+      AGENTMESH_MCPGATEWAY_API_KEY: "${AGENTMESH_MCPGATEWAY_API_KEY:-}"
     ports:
       - "${AGENTMESH_MCPGATEWAY_PORT:-8092}:8092"
     profiles: ["mcp-gateway"] # opt-in: requires the manual API-key bootstrap step above, so it never blocks `docker compose up`'s default core-stack path
