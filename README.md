@@ -46,7 +46,10 @@ Migrations under `schema/postgres/` and `schema/clickhouse/` apply automatically
 
 ### Instrumenting an agent with the Python SDK
 
+For the full step-by-step (accounts, projects, monitoring, MCP governance), see [`docs/RUNBOOK.md`](docs/RUNBOOK.md). Quick version:
+
 ```sh
+cd agentmesh
 pip install -e sdk/python  # once published: pip install agentmesh-sdk
 ```
 
