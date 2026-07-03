@@ -28,6 +28,20 @@ export function authHeaders(): HeadersInit {
   return currentApiKey ? { [API_KEY_HEADER]: currentApiKey } : {};
 }
 
+// The active project's id, stored alongside its API key so the Console
+// can show a ready-to-paste SDK snippet (which needs both) at any time
+// during the session, not just once at creation — see SetupView.tsx.
+let currentProjectID: string = localStorage.getItem('agentmesh_project_id') || '';
+
+export function getProjectID(): string {
+  return currentProjectID;
+}
+
+export function setProjectID(id: string) {
+  currentProjectID = id;
+  localStorage.setItem('agentmesh_project_id', id);
+}
+
 // Session tokens (from POST /v1/auth/login) are a second, separate
 // credential from the project API key above: they authenticate the new
 // account-management endpoints (/v1/auth/me, /v1/auth/projects, ...) via

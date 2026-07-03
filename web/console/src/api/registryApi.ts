@@ -38,6 +38,33 @@ export async function deleteMCPServer(id: string): Promise<void> {
   await apiFetch<unknown>(url.toString(), { method: 'DELETE' });
 }
 
+export interface RegisterServerRequest {
+  name: string;
+  upstream_url: string;
+  transport: MCPTransport;
+  version: string;
+  owner: string;
+  manifest_yaml: string;
+}
+
+/**
+ * POST /v1/mcp/servers — registers a server directly from the Console,
+ * so registering an MCP server never requires the CLI (`agentmesh mcp
+ * register`). Field shape mirrors createServer's request body in
+ * services/query-api/internal/rest/mcp_registry.go exactly (manifest_yaml
+ * is a free-text field the server stores verbatim for audit; the Console
+ * synthesizes a minimal YAML doc from the form fields rather than asking
+ * the user to paste one, matching what `agentmesh mcp register` does with
+ * a manifest file's parsed contents).
+ */
+export async function registerMCPServer(req: RegisterServerRequest): Promise<MCPServer> {
+  const url = new URL('/v1/mcp/servers', QUERY_API_URL);
+  return apiFetch<MCPServer>(url.toString(), {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
 interface IssueTokenResponse {
   token: string;
   prefix: string;

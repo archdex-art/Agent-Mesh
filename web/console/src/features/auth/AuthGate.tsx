@@ -12,7 +12,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { createProject, getMe, listMyProjects, login, register, type OwnedProject } from '../../api/authApi';
-import { ApiError, clearSessionToken, getSessionToken, QUERY_API_URL, setApiKey, setSessionToken } from '../../api/config';
+import { ApiError, clearSessionToken, getSessionToken, QUERY_API_URL, setApiKey, setProjectID, setSessionToken } from '../../api/config';
 
 interface AuthGateProps {
   /** Called once an API key has been established (any path) so App.tsx can flip past the gate. */
@@ -229,6 +229,7 @@ function CredentialsForm({
       }
       const data = (await res.json()) as { api_key: string; project_id: string };
       setApiKey(data.api_key);
+      setProjectID(data.project_id);
       onAnonymous();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -413,6 +414,7 @@ function ProjectPicker({ onReady, onSessionExpired }: { onReady: () => void; onS
     try {
       const result = await createProject(newProjectName.trim() || undefined);
       setApiKey(result.api_key);
+      setProjectID(result.project_id);
       onReady();
     } catch (err) {
       setError(friendlyError(err));
