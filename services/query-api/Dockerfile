@@ -6,7 +6,7 @@ WORKDIR /src
 
 COPY shared/ shared/
 COPY services/query-api/ services/query-api/
-RUN printf 'go 1.25\n\nuse (\n\t./shared\n\t./services/query-api\n)\n' > go.work
+RUN printf 'go 1.25.0\n\nuse (\n\t./shared\n\t./services/query-api\n)\n' > go.work
 
 WORKDIR /src/services/query-api
 RUN go build -o /out/query-api ./cmd

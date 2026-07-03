@@ -1,6 +1,6 @@
-module github.com/agentmesh/alerting-service
+module github.com/agentmesh/agentmesh/services/alerting-service
 
-go 1.26.4
+go 1.25.0
 
 require (
 	github.com/jackc/pgx/v5 v5.10.0

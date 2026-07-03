@@ -1,6 +1,6 @@
 module github.com/agentmesh/agentmesh/services/jobs
 
-go 1.26.4
+go 1.25.0
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.47.0

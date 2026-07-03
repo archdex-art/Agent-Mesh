@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/agentmesh/alerting-service/internal/worker"
+	"github.com/agentmesh/agentmesh/services/alerting-service/internal/worker"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

@@ -2,6 +2,11 @@
 *.test
 /bin/
 
+# Compiled binaries at example/CLI app roots (no extension, so excluded
+# by exact name rather than a glob that could shadow source files)
+examples/mock-crm-mcp-server/mock-crm-mcp-server
+cli/agentmesh
+
 # Node (web/console, sdk/typescript)
 node_modules/
 dist/
