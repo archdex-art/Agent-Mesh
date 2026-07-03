@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/agentmesh/agentmesh/services/query-api/internal/authz"
@@ -126,6 +127,15 @@ func (h *AuthHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeError(w, amerrors.New(amerrors.CodeInvalidArgument, "method not allowed"), http.StatusMethodNotAllowed)
 		}
 	default:
+		if strings.HasSuffix(r.URL.Path, "/rotate-key") && strings.HasPrefix(r.URL.Path, "/v1/auth/projects/") {
+			if r.Method != http.MethodPost {
+				writeError(w, amerrors.New(amerrors.CodeInvalidArgument, "method not allowed"), http.StatusMethodNotAllowed)
+				return
+			}
+			projectID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/auth/projects/"), "/rotate-key")
+			h.rotateProjectKey(w, r, projectID)
+			return
+		}
 		writeError(w, amerrors.New(amerrors.CodeNotFound, "not found"), http.StatusNotFound)
 	}
 }
@@ -336,6 +346,58 @@ func (h *AuthHandler) createProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]string{
 		"project_id": projectID,
 		"name":       projectName,
+		"api_key":    rawKey,
+	})
+}
+
+// rotateProjectKey mints a fresh, single active API key for a project
+// the caller owns — the ProjectPicker's "recover access" action for an
+// existing project whose original key (shown once at creation) was
+// lost. Ownership is verified against projects.owner_user_id before
+// any mutation so one account can never mint keys for another
+// account's project by guessing its id.
+func (h *AuthHandler) rotateProjectKey(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, _, err := authz.UserFromContext(r.Context())
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+
+	ctx := r.Context()
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		writeStoreError(w, amerrors.Wrap(amerrors.CodeUnavailable, "starting tx", err))
+		return
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once Commit has succeeded; the return value has no recovery action either way
+
+	var ownerUserID *string
+	if err := tx.QueryRow(ctx, `SELECT owner_user_id FROM projects WHERE id = $1`, projectID).Scan(&ownerUserID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, amerrors.New(amerrors.CodeNotFound, "project not found"), http.StatusNotFound)
+			return
+		}
+		writeStoreError(w, amerrors.Wrap(amerrors.CodeUnavailable, "looking up project", err))
+		return
+	}
+	if ownerUserID == nil || *ownerUserID != userID {
+		writeError(w, amerrors.New(amerrors.CodeNotFound, "project not found"), http.StatusNotFound)
+		return
+	}
+
+	rawKey, err := rotateProjectKey(ctx, tx, projectID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		writeStoreError(w, amerrors.Wrap(amerrors.CodeUnavailable, "committing tx", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{
+		"project_id": projectID,
 		"api_key":    rawKey,
 	})
 }
