@@ -11,8 +11,8 @@ import {
   Plus,
   Sparkles,
 } from 'lucide-react';
-import { createProject, getMe, listMyProjects, login, register, type OwnedProject } from '../../api/authApi';
-import { ApiError, clearSessionToken, getSessionToken, QUERY_API_URL, setApiKey, setSessionToken } from '../../api/config';
+import { createProject, getMe, listMyProjects, login, register, rotateProjectKey, type OwnedProject } from '../../api/authApi';
+import { ApiError, clearSessionToken, getSessionToken, QUERY_API_URL, setApiKey, setProjectID, setSessionToken } from '../../api/config';
 
 interface AuthGateProps {
   /** Called once an API key has been established (any path) so App.tsx can flip past the gate. */
@@ -229,6 +229,7 @@ function CredentialsForm({
       }
       const data = (await res.json()) as { api_key: string; project_id: string };
       setApiKey(data.api_key);
+      setProjectID(data.project_id);
       onAnonymous();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -378,6 +379,7 @@ function ProjectPicker({ onReady, onSessionExpired }: { onReady: () => void; onS
   const [creating, setCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+  const [rotatingProjectId, setRotatingProjectId] = useState<string | null>(null);
 
   function refresh() {
     setLoading(true);
@@ -413,11 +415,32 @@ function ProjectPicker({ onReady, onSessionExpired }: { onReady: () => void; onS
     try {
       const result = await createProject(newProjectName.trim() || undefined);
       setApiKey(result.api_key);
+      setProjectID(result.project_id);
       onReady();
     } catch (err) {
       setError(friendlyError(err));
     } finally {
       setCreating(false);
+    }
+  }
+
+  // A project's original key is shown once at creation and never
+  // re-exposed (userProjectView's doc comment) — so re-entering an
+  // existing project from the picker has no key to reuse. This mints a
+  // fresh one via rotate-key, which the Console can actually act on,
+  // instead of the old dead-end note that just pointed at the CLI.
+  async function handleUseProject(projectId: string) {
+    setRotatingProjectId(projectId);
+    setError('');
+    try {
+      const result = await rotateProjectKey(projectId);
+      setApiKey(result.api_key);
+      setProjectID(result.project_id);
+      onReady();
+    } catch (err) {
+      setError(friendlyError(err));
+    } finally {
+      setRotatingProjectId(null);
     }
   }
 
@@ -475,11 +498,22 @@ function ProjectPicker({ onReady, onSessionExpired }: { onReady: () => void; onS
                         </span>
                       </button>
                       {expandedProjectId === p.id && (
-                        <p className="border-t border-line/60 bg-amber/[0.05] px-4 py-3 text-xs leading-5 text-amber">
-                          This project's API key was only shown once at creation and can't be recovered here. Run{' '}
-                          <code className="rounded bg-black/30 px-1 py-0.5">agentmesh login</code> from the CLI with
-                          that key, or create a new project below instead.
-                        </p>
+                        <div className="border-t border-line/60 bg-black/10 px-4 py-3">
+                          <p className="text-xs leading-5 text-mist">
+                            This project's original key was only shown once at creation. Selecting it below issues a
+                            fresh key for this project and revokes the old one — anything still using the previous
+                            key will need updating.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleUseProject(p.id)}
+                            disabled={rotatingProjectId === p.id}
+                            className="mt-2.5 flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 text-xs font-semibold text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+                          >
+                            {rotatingProjectId === p.id ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />}
+                            Use this project
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}

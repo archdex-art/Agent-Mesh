@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/agentmesh/agentmesh/services/collector/internal/blobstore"
+	"github.com/agentmesh/agentmesh/services/collector/internal/demo"
 	"github.com/agentmesh/agentmesh/services/collector/internal/ingest"
 	"github.com/agentmesh/agentmesh/services/collector/internal/publisher"
 	"github.com/agentmesh/agentmesh/services/collector/internal/writer"
@@ -38,6 +40,7 @@ import (
 // compose stack works with zero configuration.
 type serviceConfig struct {
 	GRPCAddr           string `env:"AGENTMESH_COLLECTOR_GRPC_ADDR" yaml:"grpc_addr"`
+	HTTPAddr           string `env:"AGENTMESH_COLLECTOR_HTTP_ADDR" yaml:"http_addr"`
 	ClickHouseAddr     string `env:"AGENTMESH_CLICKHOUSE_ADDR" yaml:"clickhouse_addr"`
 	ClickHouseUser     string `env:"AGENTMESH_CLICKHOUSE_USER" yaml:"clickhouse_user"`
 	ClickHousePassword string `env:"AGENTMESH_CLICKHOUSE_PASSWORD" yaml:"clickhouse_password"`
@@ -62,6 +65,7 @@ func main() {
 func run(logger *slog.Logger) error {
 	cfg := serviceConfig{
 		GRPCAddr:           ":4317", // OTLP's conventional gRPC port
+		HTTPAddr:           ":4318", // OTLP's conventional HTTP port, otherwise unused by this service — repurposed for POST /v1/demo/seed
 		ClickHouseAddr:     "localhost:9000",
 		ClickHouseUser:     "default",
 		ClickHousePassword: "agentmesh", // matches deploy/docker-compose.yml's CLICKHOUSE_PASSWORD
@@ -140,8 +144,11 @@ func run(logger *slog.Logger) error {
 	decoder := ingest.NewDecoder()
 	offloader := ingest.NewOffloader(blobClient)
 	server := ingest.NewServer(authStore, decoder, offloader, spanWriter)
+	var demoPublisher demo.SpanPublisher // nil interface unless Redis is up; demo.Handler treats nil the same as ingest.Server does
 	if redisClient != nil {
-		server.SetPublisher(publisher.New(redisClient, logger))
+		p := publisher.New(redisClient, logger)
+		server.SetPublisher(p)
+		demoPublisher = p
 	}
 
 	lis, err := net.Listen("tcp", cfg.GRPCAddr)
@@ -152,20 +159,40 @@ func run(logger *slog.Logger) error {
 	grpcServer := grpc.NewServer()
 	collectorpb.RegisterTraceServiceServer(grpcServer, server)
 
-	serveErr := make(chan error, 1)
+	// A minimal, second HTTP surface alongside the OTLP gRPC receiver:
+	// POST /v1/demo/seed (internal/demo) lets the Console's "Run Demo"/
+	// "Generate Sample Data" buttons populate a brand-new project with
+	// realistic traces without a browser needing to speak gRPC, which
+	// the real SDK ingestion path (this file's grpcServer above)
+	// deliberately does require. It shares this process's authStore,
+	// spanWriter, and demoPublisher so a demo trace is authenticated,
+	// persisted, and fanned out exactly like a real one.
+	demoHandler := demo.NewHandler(authStore, spanWriter, demoPublisher)
+	httpServer := &http.Server{Addr: cfg.HTTPAddr, Handler: demoHandler}
+
+	serveErr := make(chan error, 2)
 	go func() {
 		logger.Info("collector listening", slog.String("addr", cfg.GRPCAddr))
 		serveErr <- grpcServer.Serve(lis)
+	}()
+	go func() {
+		logger.Info("collector demo-seed http endpoint listening", slog.String("addr", cfg.HTTPAddr))
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serveErr <- fmt.Errorf("http server: %w", err)
+		}
 	}()
 
 	select {
 	case <-ctx.Done():
 		logger.Info("shutdown signal received, stopping gracefully")
 		grpcServer.GracefulStop()
+		_ = httpServer.Shutdown(context.Background())
 		return nil
 	case err := <-serveErr:
 		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			return fmt.Errorf("grpc server: %w", err)
+			grpcServer.GracefulStop()
+			_ = httpServer.Shutdown(context.Background())
+			return fmt.Errorf("collector server: %w", err)
 		}
 		return nil
 	}

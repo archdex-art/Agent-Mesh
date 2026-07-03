@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { listTraces, type TraceSummary } from '../../api/queryApi';
 import { Panel } from '../../components/Panel';
 import { StatusBadge } from '../../components/StatusBadge';
+import { RunDemoPanel } from '../demo/RunDemoPanel';
 
 type SortKey = 'span_count' | 'total_cost_usd' | 'error_span_count';
 type StatusFilter = 'all' | 'ok' | 'error';
@@ -25,6 +26,7 @@ export function TraceList({ onSelectTrace }: TraceListProps) {
   const [sortKey, setSortKey] = useState<SortKey>('total_cost_usd');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,7 +47,7 @@ export function TraceList({ onSelectTrace }: TraceListProps) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
 
   const visible = useMemo(() => {
     const filtered =
@@ -101,7 +103,7 @@ export function TraceList({ onSelectTrace }: TraceListProps) {
         </p>
       )}
       {!loading && !error && visible.length === 0 && (
-        <p className="text-mist">No traces found.</p>
+        <RunDemoPanel variant="empty-state" onSeeded={() => setRefreshKey((k) => k + 1)} />
       )}
 
       {!loading && !error && visible.length > 0 && (

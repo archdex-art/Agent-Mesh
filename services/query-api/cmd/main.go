@@ -111,6 +111,12 @@ func run(logger *slog.Logger) error {
 	mux.Handle("/v1/auth/login", authHandler)
 	mux.Handle("/v1/auth/me", authz.SessionMiddleware(pgPool)(authHandler))
 	mux.Handle("/v1/auth/projects", authz.SessionMiddleware(pgPool)(authHandler))
+	// Subtree pattern (trailing slash) required in addition to the exact
+	// "/v1/auth/projects" match above: Go's stdlib ServeMux only routes
+	// "/v1/auth/projects/<anything>" to a handler registered against the
+	// subtree pattern, not the exact one — needed for POST
+	// /v1/auth/projects/{id}/rotate-key.
+	mux.Handle("/v1/auth/projects/", authz.SessionMiddleware(pgPool)(authHandler))
 
 	handler := rest.CORSMiddleware(mux)
 

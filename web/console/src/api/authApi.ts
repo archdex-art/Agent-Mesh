@@ -90,3 +90,22 @@ export async function createProject(name?: string): Promise<CreateProjectRespons
     body: JSON.stringify(name ? { name } : {}),
   });
 }
+
+/** Mirrors rest.rotateProjectKey's response. */
+export interface RotateKeyResponse {
+  project_id: string;
+  api_key: string;
+}
+
+/**
+ * POST /v1/auth/projects/{id}/rotate-key — mints a fresh, single active
+ * API key for a project this session's user owns, revoking any prior
+ * key. The ProjectPicker's recovery action for an existing project
+ * whose original key (shown once at creation) was lost or never
+ * captured — the only way back into a project via the Console UI
+ * without the CLI.
+ */
+export async function rotateProjectKey(projectId: string): Promise<RotateKeyResponse> {
+  const url = new URL(`/v1/auth/projects/${encodeURIComponent(projectId)}/rotate-key`, QUERY_API_URL);
+  return apiFetchWithSession<RotateKeyResponse>(url.toString(), getSessionToken(), { method: 'POST' });
+}

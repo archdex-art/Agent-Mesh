@@ -91,3 +91,43 @@ func createProjectAndKey(ctx context.Context, tx pgx.Tx, ownerUserID *string, na
 
 	return projectID, projectName, rawKey, nil
 }
+
+// rotateProjectKey mints a fresh API key for an already-provisioned
+// project and revokes every previously active key, in one transaction —
+// the recovery path for AuthGate's ProjectPicker: an existing project's
+// raw key is shown once at creation and never re-exposed (see
+// userProjectView's doc comment), so re-selecting an existing project
+// from the picker has no key to fall back to. Rotating instead of just
+// minting an additional key keeps "how many active keys can a project
+// have" at the same invariant createProjectAndKey establishes (exactly
+// one), so callers never have to reason about which of several active
+// keys is "the" one currently in use.
+func rotateProjectKey(ctx context.Context, tx pgx.Tx, projectID string) (rawKey string, err error) {
+	rawBytes := make([]byte, 16)
+	if _, err := rand.Read(rawBytes); err != nil {
+		return "", amerrors.Wrap(amerrors.CodeInternal, "generating key bytes", err)
+	}
+	rawKey = "am_live_" + hex.EncodeToString(rawBytes)
+
+	hashedKey := authkeys.Hash(rawKey)
+	prefix, err := authkeys.Prefix(rawKey)
+	if err != nil {
+		return "", amerrors.Wrap(amerrors.CodeInternal, "computing key prefix", err)
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE api_keys SET revoked_at = now() WHERE project_id = $1 AND revoked_at IS NULL`,
+		projectID,
+	); err != nil {
+		return "", amerrors.Wrap(amerrors.CodeUnavailable, "revoking previous api keys", err)
+	}
+
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO api_keys (id, project_id, hashed_key, prefix, role) VALUES (gen_random_uuid(), $1, $2, $3, 'ingest')`,
+		projectID, hashedKey, prefix,
+	); err != nil {
+		return "", amerrors.Wrap(amerrors.CodeUnavailable, "inserting api key", err)
+	}
+
+	return rawKey, nil
+}
