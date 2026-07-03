@@ -3,6 +3,8 @@ go 1.26.4
 use (
 	./cli
 	./examples/mock-crm-mcp-server
+	./services/alerting-service
+	./services/anomaly-detector
 	./services/collector
 	./services/jobs
 	./services/mcp-gateway

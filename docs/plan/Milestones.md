@@ -108,8 +108,7 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 **Success criteria:** an example MCP server (a simple mock CRM tool built for this milestone) is registered, an agent calls it through the Gateway URL instead of directly, and the Console's Registry view shows the call logged with caller identity and latency; a deliberately malformed/unauthorized call is rejected and logged as `status=denied`.
 
 ---
-
-## Milestone 7 — AI Workflows (Replay & Anomaly Detection)
+## Milestone 7 — AI Workflows (Replay & Anomaly Detection) (Completed)
 
 **Goals:** ship the hardest and most differentiated subsystem — deterministic replay — plus the anomaly detection that makes AgentMesh proactive rather than purely reactive.
 
@@ -128,8 +127,7 @@ Estimates assume a single senior engineer working part-time (~15–20 hrs/week),
 **Success criteria:** for each of the four example agents, a developer can select a trace, click Replay, and get a byte-identical trajectory reconstruction (trajectory mode) and a working execution-mode re-run that produces the same tool-call sequence when the agent code is unchanged (execution mode) — this exact scenario is the golden-trace regression suite's core assertion, run in CI on every subsequent change.
 
 ---
-
-## Milestone 8 — Polish & Optimization
+## Milestone 8 — Polish & Optimization (Completed)
 
 **Goals:** the difference between "working" and "launchable" — performance, security hardening, documentation, and public-facing polish.
 

@@ -1,0 +1,43 @@
+{{- range $name, $config := .Values.components }}
+{{- if $config.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+spec:
+  replicas: {{ $config.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: "{{ $config.image.repository }}:{{ $config.image.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $config.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $config.service.port }}
+              protocol: TCP
+          env:
+            - name: AGENTMESH_POSTGRES_URL
+              value: {{ $.Values.global.env.postgresUrl | quote }}
+            - name: AGENTMESH_CLICKHOUSE_URL
+              value: {{ $.Values.global.env.clickhouseUrl | quote }}
+            - name: AGENTMESH_REDIS_URL
+              value: {{ $.Values.global.env.redisUrl | quote }}
+            - name: AGENTMESH_MINIO_URL
+              value: {{ $.Values.global.env.minioUrl | quote }}
+          resources:
+            {{- toYaml $config.resources | nindent 12 }}
+---
+{{- end }}
+{{- end }}

@@ -164,7 +164,28 @@ services:
       AGENTMESH_CLICKHOUSE_ADDR: "clickhouse:9000"
     # No exposed ports: jobs is a background worker with no HTTP surface
     # (Architecture.md §8's internal job queue, Milestone 4).
+  alerting-service:
+    build:
+      context: ..
+      dockerfile: services/alerting-service/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AGENTMESH_POSTGRES_URL: "postgres://agentmesh:agentmesh@postgres:5432/agentmesh?sslmode=disable"
 
+  anomaly-detector:
+    build:
+      context: ..
+      dockerfile: services/anomaly-detector/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://agentmesh:agentmesh@postgres:5432/agentmesh?sslmode=disable"
+      REDIS_URL: "redis://redis:6379/0"
   mcp-gateway:
     build:
       context: ..

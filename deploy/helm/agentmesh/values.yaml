@@ -1,0 +1,61 @@
+global:
+  env:
+    postgresUrl: "postgres://postgres:postgres@postgres:5432/agentmesh?sslmode=disable"
+    clickhouseUrl: "tcp://clickhouse:9000?debug=false"
+    redisUrl: "redis://redis:6379"
+    minioUrl: "s3://minioadmin:minioadmin@minio:9000/agentmesh"
+
+components:
+  collector:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: agentmesh/collector
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 4317
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  queryApi:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: agentmesh/query-api
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 8080
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  mcpGateway:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: agentmesh/mcp-gateway
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 8081
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
