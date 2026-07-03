@@ -10,6 +10,13 @@ export const QUERY_API_URL: string =
 export const REPLAY_ENGINE_URL: string =
   import.meta.env.VITE_REPLAY_ENGINE_URL?.trim() || 'http://localhost:8090';
 
+// The Collector's demo-seed HTTP endpoint (POST /v1/demo/seed,
+// services/collector/internal/demo) — distinct from its OTLP gRPC
+// ingestion port (4317, browsers can't speak gRPC), matching
+// deploy/docker-compose.yml's AGENTMESH_COLLECTOR_HTTP_ADDR default.
+export const COLLECTOR_URL: string =
+  import.meta.env.VITE_COLLECTOR_URL?.trim() || 'http://localhost:4318';
+
 let currentApiKey: string = import.meta.env.VITE_API_KEY?.trim() || localStorage.getItem('agentmesh_api_key') || '';
 
 export function getApiKey(): string {

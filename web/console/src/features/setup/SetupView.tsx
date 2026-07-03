@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, Copy, Eye, EyeOff } from 'lucide-react';
 import { getApiKey, getProjectID, QUERY_API_URL } from '../../api/config';
 import { Panel } from '../../components/Panel';
+import { RunDemoPanel } from '../demo/RunDemoPanel';
 
 /**
  * "How do I actually use this outside the browser?" is the single
@@ -134,6 +135,11 @@ tracer.shutdown()`;
         <pre className="mono overflow-x-auto rounded-lg border border-line bg-black/30 p-4 text-xs leading-5 text-fog/90">
           {curlSnippet}
         </pre>
+      </Panel>
+
+      <Panel>
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-mist">Generate sample data</h3>
+        <RunDemoPanel variant="full" onSeeded={() => { /* Traces view re-fetches on its own mount/focus; nothing to wire here */ }} />
       </Panel>
     </div>
   );
